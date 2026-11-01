@@ -1,0 +1,456 @@
+/* ==========================================================================
+   PT RantauMart Riau — Odoo Web 17.0 Desktop Minimalist Card Grid UI (style.css)
+   Menggunakan Bootstrap 5 CDN:
+   1. Sticky Header (position: sticky; top: 0; z-index: 1020;)
+   2. Left Sidebar (bg-light) kontras dengan Main Content + active highlight tegas
+   3. Dashboard Card Grid (row + col-md-4, bg-white, rounded-4, shadow-sm, hover effect)
+   4. Pemisahan Per Bagian (Metrik Stok, Dokumen Aktif, Quick Actions dalam kotak terpisah)
+   5. Tabel Interaktif Zebra Striping (table-striped + table-hover)
+   6. Indikator Akses (cursor: pointer vs cursor: not-allowed; opacity: 0.5; pointer-events: none;)
+   7. Pipeline Statusbar, Badge Warna (Hijau/Kuning/Merah), dan Floating Toasts
+   ========================================================================== */
+
+:root {
+    --o-dark-navbar: #111827;
+    --o-sidebar-light: #f8f9fa;
+    --o-main-white: #ffffff;
+    --o-canvas-bg: #f8fafc;
+    --o-border-color: #e2e8f0;
+    --o-primary: #0f766e;
+    --o-primary-dark: #115e59;
+    --o-primary-soft: #ccfbf1;
+    --o-text-main: #1e293b;
+    --o-text-muted: #64748b;
+}
+
+body {
+    background-color: var(--o-canvas-bg);
+    color: var(--o-text-main);
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ==========================================================================
+   1. TATA LETAK & STICKY HEADER (Top Navbar & Control Panel)
+   ========================================================================== */
+.o-sticky-header,
+.o-main-navbar,
+.o-control-panel {
+    position: sticky;
+    top: 0;
+    z-index: 1020;
+}
+
+.o-main-navbar {
+    background-color: var(--o-dark-navbar) !important;
+    height: 46px;
+    min-height: 46px;
+    padding: 0 1.25rem;
+    z-index: 1030;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.o-control-panel {
+    top: 46px;
+    z-index: 1020;
+    background-color: var(--o-main-white);
+    border-bottom: 1px solid var(--o-border-color);
+    padding: 0.85rem 1.75rem;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03);
+}
+
+.o-app-switcher-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: #f8fafc;
+    background-color: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    font-weight: 600;
+    font-size: 0.8125rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 0.375rem;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.o-app-switcher-btn:hover,
+.o-app-switcher-btn:focus {
+    background-color: rgba(255, 255, 255, 0.18);
+    color: #ffffff;
+}
+
+.o-navbar-brand {
+    color: #ffffff;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.o-profile-btn {
+    color: #f1f5f9;
+    background-color: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    font-size: 0.8125rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 0.375rem;
+    cursor: pointer;
+}
+
+.o-profile-btn:hover,
+.o-profile-btn:focus {
+    background-color: rgba(255, 255, 255, 0.18);
+    color: #ffffff;
+}
+
+/* ==========================================================================
+   2. SIDEBAR (bg-light) & KONTRAS VISUAL DENGAN MAIN CONTENT (bg-white)
+   ========================================================================== */
+.o-workspace {
+    min-height: calc(100vh - 46px);
+}
+
+.o-sidebar {
+    background-color: var(--o-sidebar-light) !important;
+    border-right: 1px solid var(--o-border-color);
+    min-height: calc(100vh - 46px);
+    padding: 1.5rem 1.15rem;
+}
+
+/* Layout Induk Statis: Sidebar & Control Panel tetap kokoh di desktop */
+@media (min-width: 768px) {
+    .o-sidebar {
+        position: sticky;
+        top: 46px;
+        height: calc(100vh - 46px);
+        overflow-y: auto;
+    }
+}
+
+.o-main-wrapper {
+    background-color: var(--o-canvas-bg) !important;
+    min-height: calc(100vh - 46px);
+}
+
+/* Efek Fade-In Ringan SPA untuk Konten Dinamis */
+@keyframes oSpaFadeIn {
+    0% {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.o-spa-fade-in,
+.o-module-view,
+.o-content-canvas {
+    animation: oSpaFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.o-sidebar-group {
+    margin-bottom: 1.65rem;
+}
+
+.o-sidebar-section-title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--o-text-muted);
+    margin-bottom: 0.6rem;
+    padding: 0 0.75rem;
+}
+
+.o-sidebar-nav .nav-link {
+    color: #334155;
+    font-size: 0.84rem;
+    font-weight: 500;
+    padding: 0.6rem 0.85rem;
+    border-radius: 0.45rem;
+    margin-bottom: 0.35rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.o-sidebar-nav .nav-link:hover {
+    background-color: #e2e8f0;
+    color: #0f172a;
+}
+
+/* Highlight tegas pada menu yang sedang aktif */
+.o-sidebar-nav .nav-link.active {
+    background-color: var(--o-primary);
+    color: #ffffff !important;
+    font-weight: 600;
+    border-left: 4px solid #042f2e;
+    box-shadow: 0 2px 6px rgba(15, 118, 110, 0.22);
+}
+
+/* ==========================================================================
+   3. INDIKATOR AKSES (Interactive Pointer vs Blocked Role Action F-01)
+   ========================================================================== */
+.o-interactive,
+.btn,
+.dropdown-item,
+.form-select,
+.o-app-card,
+.o-module-card,
+.o-modern-table tbody tr {
+    cursor: pointer;
+}
+
+/* Wrapper & kelas khusus untuk tombol/aksi di luar wewenang role aktif (F-01) */
+.o-blocked-wrapper {
+    cursor: not-allowed !important;
+    display: inline-block;
+}
+
+.o-action-disabled {
+    cursor: not-allowed !important;
+    opacity: 0.5 !important;
+    pointer-events: none !important;
+    user-select: none;
+}
+
+/* ==========================================================================
+   4. DASHBOARD CARD GRID & PEMISAHAN WADAH KOTAK PER BAGIAN
+   ========================================================================== */
+.o-section-box {
+    background-color: var(--o-main-white);
+    border: 1px solid var(--o-border-color);
+    border-radius: 1rem;
+    padding: 1.5rem;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03);
+}
+
+.o-module-card,
+.o-app-card {
+    background-color: var(--o-main-white);
+    border: 1px solid var(--o-border-color);
+    border-radius: 1rem;
+    padding: 1.35rem 1.4rem;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.o-module-card:hover,
+.o-app-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08) !important;
+    border-color: var(--o-primary) !important;
+}
+
+.o-module-card.active-card {
+    border-color: var(--o-primary);
+    box-shadow: 0 4px 14px rgba(15, 118, 110, 0.12) !important;
+}
+
+.o-module-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 0.85rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    background-color: #f0fdfa;
+    color: var(--o-primary);
+    border: 1px solid #99f6e4;
+    flex-shrink: 0;
+}
+
+.o-doc-item,
+.o-quick-action-item {
+    background-color: #f8fafc;
+    border: 1px solid var(--o-border-color);
+    border-radius: 0.75rem;
+    padding: 0.85rem 1rem;
+    transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.o-doc-item:hover,
+.o-quick-action-item:hover {
+    background-color: #ffffff;
+    border-color: var(--o-primary);
+    transform: translateY(-1px);
+}
+
+/* ==========================================================================
+   5. TABEL INTERAKTIF (Zebra Striping: table-striped & table-hover)
+   ========================================================================== */
+.o-modern-table {
+    margin-bottom: 0;
+}
+
+.o-modern-table thead th {
+    background-color: #f1f5f9;
+    color: #334155;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.85rem 1rem;
+    border-bottom: 2px solid var(--o-border-color);
+}
+
+.o-modern-table tbody td {
+    padding: 0.8rem 1rem;
+    vertical-align: middle;
+}
+
+/* ==========================================================================
+   6. PIPELINE STATUSBAR, TOMBOL PASTEL & FLOATING TOAST NOTIFICATIONS
+   ========================================================================== */
+.o-main-content {
+    padding: 1.75rem 2rem;
+}
+
+.o-control-input {
+    background-color: #f8fafc;
+    border: 1px solid var(--o-border-color);
+    border-radius: 0.4rem;
+    font-size: 0.8125rem;
+    padding: 0.35rem 0.75rem;
+}
+
+.btn-soft-gray {
+    background-color: #f1f5f9;
+    color: #334155;
+    border: 1px solid #cbd5e1;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    padding: 0.4rem 0.85rem;
+    border-radius: 0.5rem;
+    transition: all 0.15s ease;
+}
+
+.btn-soft-gray:hover {
+    background-color: #e2e8f0;
+    color: #0f172a;
+}
+
+.btn-pastel {
+    background-color: #e6f4f1;
+    color: var(--o-primary);
+    border: 1px solid #99f6e4;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    padding: 0.4rem 0.9rem;
+    border-radius: 0.5rem;
+    transition: all 0.15s ease;
+}
+
+.btn-pastel:hover {
+    background-color: #ccfbf1;
+    color: var(--o-primary-dark);
+}
+
+.o-view-switcher .btn {
+    background-color: #f8fafc;
+    color: #475569;
+    border: 1px solid var(--o-border-color);
+    font-size: 0.8rem;
+    font-weight: 500;
+    padding: 0.35rem 0.75rem;
+}
+
+.o-view-switcher .btn.active {
+    background-color: var(--o-primary);
+    border-color: var(--o-primary);
+    color: #ffffff;
+    font-weight: 600;
+}
+
+/* Pipeline Statusbar di bagian atas Form / Dokumen */
+.o-statusbar {
+    display: inline-flex;
+    align-items: center;
+    background-color: #f8fafc;
+    border: 1px solid var(--o-border-color);
+    border-radius: 0.4rem;
+    overflow: hidden;
+    font-size: 0.76rem;
+}
+
+.o-statusbar-step {
+    padding: 0.3rem 0.85rem;
+    color: var(--o-text-muted);
+    border-right: 1px solid var(--o-border-color);
+    font-weight: 500;
+}
+
+.o-statusbar-step:last-child {
+    border-right: none;
+}
+
+.o-statusbar-step.current {
+    background-color: var(--o-primary);
+    color: #ffffff;
+    font-weight: 700;
+}
+
+/* Kartu Surface, KPI & Kanban */
+.o-surface-card {
+    background-color: var(--o-main-white);
+    border: 1px solid var(--o-border-color);
+    border-radius: 1rem;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03);
+}
+
+.o-kpi-card {
+    background-color: var(--o-main-white);
+    border: 1px solid var(--o-border-color);
+    border-radius: 0.85rem;
+    padding: 1.15rem 1.25rem;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.o-kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 14px rgba(15, 23, 42, 0.05);
+    border-color: var(--o-primary);
+}
+
+.o-kanban-card {
+    background-color: var(--o-main-white);
+    border: 1px solid var(--o-border-color);
+    border-radius: 0.85rem;
+    padding: 1.1rem;
+    height: 100%;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.o-kanban-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 14px rgba(15, 23, 42, 0.06);
+    border-color: var(--o-primary);
+}
+
+.o-form-sheet {
+    background-color: var(--o-main-white);
+    border: 1px solid var(--o-border-color);
+    border-radius: 0.85rem;
+    padding: 1.75rem;
+}
+
+/* Floating Toast Container di Pojok Kanan Atas */
+.o-toast-container {
+    position: fixed;
+    top: 56px;
+    right: 20px;
+    z-index: 1090;
+}
+
+/* SR-19 Executive Dashboard cards */
+.o-exec-card { transition: transform .15s ease, box-shadow .15s ease; cursor: pointer; }
+.o-exec-card:hover { transform: translateY(-4px); box-shadow: 0 .75rem 1.5rem rgba(0,0,0,.12) !important; }
+
