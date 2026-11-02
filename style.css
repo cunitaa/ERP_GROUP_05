@@ -240,6 +240,7 @@ body {
     border-radius: 1rem;
     padding: 1.35rem 1.4rem;
     transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    width: 100%;
 }
 
 .o-module-card:hover,
@@ -453,4 +454,177 @@ body {
 /* SR-19 Executive Dashboard cards */
 .o-exec-card { transition: transform .15s ease, box-shadow .15s ease; cursor: pointer; }
 .o-exec-card:hover { transform: translateY(-4px); box-shadow: 0 .75rem 1.5rem rgba(0,0,0,.12) !important; }
+
+/* ==========================================================================
+   7. ODOO WEB 17.0 HOME APP SWITCHER TILES, SMART BUTTONS & CHATTER LOG NOTES
+   ========================================================================== */
+.o-app-launcher-grid {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 1.25rem !important;
+    margin: 0 !important;
+}
+
+.o-app-launcher-grid > .col,
+.o-app-launcher-grid > div {
+    flex: 0 0 160px !important;
+    max-width: 180px !important;
+    min-width: 140px !important;
+    width: 160px !important;
+    padding: 0 !important;
+}
+
+@media (max-width: 575.98px) {
+    .o-app-launcher-grid > .col,
+    .o-app-launcher-grid > div {
+        flex: 1 0 calc(50% - 0.75rem) !important;
+        max-width: 100% !important;
+        width: auto !important;
+    }
+}
+
+.o-app-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25rem 0.75rem;
+    min-height: 140px;
+    width: 100%;
+    border-radius: 1rem;
+    background-color: #ffffff;
+    border: 1px solid var(--o-border-color);
+    text-decoration: none;
+    color: var(--o-text-main);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.o-app-tile:hover {
+    transform: translateY(-4px) scale(1.03);
+    box-shadow: 0 10px 22px rgba(15, 23, 42, 0.1);
+    border-color: #cbd5e1;
+    color: var(--o-text-main);
+}
+
+.o-app-tile-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.85rem;
+    color: #ffffff;
+    margin-bottom: 0.75rem;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.12);
+}
+
+.o-app-tile-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-align: center;
+    line-height: 1.2;
+}
+
+.o-app-tile-sub {
+    font-size: 0.7rem;
+    color: var(--o-text-muted);
+    margin-top: 0.2rem;
+}
+
+/* Odoo Smart Buttons (oe_button_box) */
+.oe_button_box {
+    display: flex;
+    justify-content: flex-end;
+    align-items: stretch;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.oe_stat_button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.45rem 0.85rem;
+    background-color: #ffffff;
+    border: 1px solid var(--o-border-color);
+    border-radius: 0.5rem;
+    text-decoration: none;
+    color: var(--o-text-main);
+    transition: all 0.15s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+}
+
+.oe_stat_button:hover {
+    background-color: #f8fafc;
+    border-color: #94a3b8;
+    color: var(--o-primary-dark);
+}
+
+.oe_stat_button i {
+    font-size: 1.35rem;
+    opacity: 0.85;
+}
+
+.oe_stat_button .stat-number {
+    display: block;
+    font-weight: 700;
+    font-size: 0.85rem;
+    line-height: 1.1;
+    color: #0f172a;
+}
+
+.oe_stat_button .stat-label {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--o-text-muted);
+    line-height: 1.1;
+}
+
+/* Odoo Chatter / Log Notes */
+.o-chatter-box {
+    background-color: #f8fafc;
+    border-top: 1px solid var(--o-border-color);
+    margin: 1.5rem -1.75rem -1.75rem -1.75rem;
+    padding: 1.25rem 1.75rem;
+    border-bottom-left-radius: 0.85rem;
+    border-bottom-right-radius: 0.85rem;
+}
+
+.o-chatter-item {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 0.85rem;
+}
+
+.o-chatter-item:last-child {
+    margin-bottom: 0;
+}
+
+.o-chatter-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background-color: #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    color: #475569;
+    flex-shrink: 0;
+}
+
+.o-chatter-content {
+    background-color: #ffffff;
+    border: 1px solid var(--o-border-color);
+    border-radius: 0.5rem;
+    padding: 0.6rem 0.85rem;
+    flex-grow: 1;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+}
+
 

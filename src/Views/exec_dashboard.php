@@ -13,7 +13,7 @@ if (!is_array($exec)) {
 $m        = (array) $exec['metrics'];
 $drill    = $exec['drill'] ?? null;
 $drillKey = $exec['drill_key'] ?? null;
-$rp       = static fn (float $n): string => 'Rp' . number_format($n, 0, ',', '.');
+$rp       = static fn (float $n): string => 'Rp ' . number_format($n, 2, ',', '.');
 $n        = static fn (int $n): string => number_format($n, 0, ',', '.');
 $recon    = (array) ($m['reconciliation'] ?? []);
 
@@ -51,7 +51,7 @@ $execCards = [
             $active = ($drillKey === $c['key']);
             $href   = 'index.php?drill=' . urlencode($c['key']) . '&view=' . urlencode((string) ($activeView ?? 'list')) . '#exec-drill';
         ?>
-            <div class="col-12 col-sm-6 col-xl-3">
+            <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
                 <a href="<?= htmlspecialchars($href) ?>" class="text-decoration-none d-block h-100" data-drill="<?= htmlspecialchars($c['key']) ?>">
                     <div class="card h-100 bg-white rounded-4 shadow-sm border-0 o-exec-card text-center <?= $active ? 'border border-2 border-' . $c['tone'] : '' ?>">
                         <div class="card-body py-4">
@@ -73,10 +73,33 @@ $execCards = [
         <div id="exec-drill" class="mt-4 pt-3 border-top" data-testid="exec-drill">
             <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
                 <div>
-                    <h6 class="fw-bold mb-0"><?= htmlspecialchars((string) $drill['title']) ?></h6>
+                    <h6 class="fw-bold mb-0 text-dark"><?= htmlspecialchars((string) $drill['title']) ?></h6>
                     <span class="text-muted small"><?= htmlspecialchars((string) $drill['subtitle']) ?></span>
                 </div>
-                <a href="index.php?view=<?= urlencode((string) ($activeView ?? 'list')) ?>#exec-dashboard" class="btn btn-sm btn-outline-secondary rounded-pill">Tutup rincian</a>
+                <div class="d-flex align-items-center gap-2">
+                    <?php if ($drillKey === 'ar'): ?>
+                        <a href="index.php?page=accounting&module=Accounting&screen=S-10" class="btn btn-sm btn-warning rounded-pill text-dark fw-semibold">
+                            Buka List View Customer Invoices <i class="bi bi-arrow-right"></i>
+                        </a>
+                    <?php elseif ($drillKey === 'ap'): ?>
+                        <a href="index.php?page=accounting&module=Accounting&screen=S-12" class="btn btn-sm btn-danger rounded-pill text-white fw-semibold">
+                            Buka List View Vendor Bills <i class="bi bi-arrow-right"></i>
+                        </a>
+                    <?php elseif ($drillKey === 'stock'): ?>
+                        <a href="index.php?page=inventory&module=Inventory&screen=S-03" class="btn btn-sm btn-primary rounded-pill text-white fw-semibold">
+                            Buka List View Stok Gudang <i class="bi bi-arrow-right"></i>
+                        </a>
+                    <?php elseif ($drillKey === 'pos_sales' || $drillKey === 'cash'): ?>
+                        <a href="index.php?page=pos&module=Point+of+Sale&screen=S-15" class="btn btn-sm btn-info rounded-pill text-white fw-semibold">
+                            Buka Modul Kasir POS <i class="bi bi-arrow-right"></i>
+                        </a>
+                    <?php elseif ($drillKey === 'bank' || $drillKey === 'cogs'): ?>
+                        <a href="index.php?page=accounting&module=Accounting&screen=S-13" class="btn btn-sm btn-dark rounded-pill text-white fw-semibold">
+                            Buka Buku Besar (Ledger) <i class="bi bi-arrow-right"></i>
+                        </a>
+                    <?php endif; ?>
+                    <a href="index.php?view=<?= urlencode((string) ($activeView ?? 'list')) ?>#exec-dashboard" class="btn btn-sm btn-outline-secondary rounded-pill">Tutup rincian</a>
+                </div>
             </div>
             <div class="table-responsive">
                 <table class="table table-sm table-striped table-hover align-middle mb-0">

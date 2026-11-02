@@ -31,6 +31,16 @@ class FlashService
         ];
     }
 
+    public static function error(string $message, string $title = 'Akses Ditolak'): void
+    {
+        self::push($message, 'danger', $title);
+    }
+
+    public static function success(string $message, string $title = 'Berhasil'): void
+    {
+        self::push($message, 'success', $title);
+    }
+
     /** Tampung dulu; terbit setelah commit, hilang saat rollback. */
     public static function stage(string $message, string $type = 'success', string $title = 'Berhasil'): void
     {

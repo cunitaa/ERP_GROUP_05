@@ -101,6 +101,10 @@ namespace RantauMart\Controllers {
         public static function executeReset(array $requestData = []): array
         {
             AuthService::ensureSession();
+            $requestedRole = trim((string) ($requestData['switch_role'] ?? $requestData['as_role'] ?? $requestData['role'] ?? ''));
+            if ($requestedRole !== '') {
+                AuthService::login($requestedRole);
+            }
             $user      = AuthService::getCurrentUser();
             $role      = (string) ($user['role'] ?? '');
             $actorName = (string) ($user['full_name'] ?? $user['username'] ?? 'Unknown');

@@ -1948,10 +1948,86 @@ class AccountingController
     }
 
     /**
+     * Validasi mutlak Jurnal Pembukaan (Opening Journal): Total Debit = Total Credit = Rp25.716.900.
+     * Rincian Persisten:
+     * - DEBIT : Inventory (1130) Rp9.628.900 | AR C002 (1100) Rp888.000 | Bank (1010) Rp15.000.000 | POS Cash Drawer (1020) Rp200.000.
+     * - CREDIT: AP V01 (2010) Rp555.000 | Opening Equity (3010) Rp25.161.900.
+     * @return array<string, mixed>
+     */
+    public static function validateOpeningJournal(): array
+    {
+        $pdo = Database::getConnection();
+        $stmt = $pdo->prepare("
+            SELECT je.entry_number, je.status, je.is_opening_entry,
+                   jel.account_code, jel.partner_id, jel.debit, jel.credit, jel.memo
+            FROM journal_entries je
+            JOIN journal_entry_lines jel ON jel.entry_number = je.entry_number
+            WHERE je.entry_number = 'JE-OPEN-0001' OR je.is_opening_entry = 1
+            ORDER BY jel.id ASC
+        ");
+        $stmt->execute();
+        $lines = $stmt->fetchAll() ?: [];
+
+        $totalDebit  = 0.0;
+        $totalCredit = 0.0;
+        $debits = [];
+        $credits = [];
+
+        foreach ($lines as $l) {
+            $acc = (string) $l['account_code'];
+            $d   = (float) $l['debit'];
+            $c   = (float) $l['credit'];
+            $p   = (string) ($l['partner_id'] ?? '');
+
+            $totalDebit  += $d;
+            $totalCredit += $c;
+
+            if ($d > 0) {
+                $debits[$acc] = ['debit' => $d, 'partner_id' => $p, 'memo' => (string) $l['memo']];
+            }
+            if ($c > 0) {
+                $credits[$acc] = ['credit' => $c, 'partner_id' => $p, 'memo' => (string) $l['memo']];
+            }
+        }
+
+        $invOk   = abs((float) ($debits['1130']['debit'] ?? 0) - 9628900.0) < 0.01;
+        $arOk    = abs((float) ($debits['1100']['debit'] ?? 0) - 888000.0) < 0.01 && ($debits['1100']['partner_id'] ?? '') === 'C002';
+        $bankOk  = abs((float) ($debits['1010']['debit'] ?? 0) - 15000000.0) < 0.01;
+        $cashOk  = abs((float) ($debits['1020']['debit'] ?? 0) - 200000.0) < 0.01;
+
+        $apOk    = abs((float) ($credits['2010']['credit'] ?? 0) - 555000.0) < 0.01 && ($credits['2010']['partner_id'] ?? '') === 'V01';
+        $eqOk    = abs((float) ($credits['3010']['credit'] ?? 0) - 25161900.0) < 0.01;
+
+        $isBalanced = abs($totalDebit - 25716900.0) < 0.01 && abs($totalCredit - 25716900.0) < 0.01 && abs($totalDebit - $totalCredit) < 0.01;
+        $isValid    = $invOk && $arOk && $bankOk && $cashOk && $apOk && $eqOk && $isBalanced;
+
+        return [
+            'valid'        => $isValid,
+            'is_balanced'  => $isBalanced,
+            'total_debit'  => $totalDebit,
+            'total_credit' => $totalCredit,
+            'expected'     => 25716900.0,
+            'checks'       => [
+                'inventory_1130' => $invOk,
+                'ar_c002_1100'   => $arOk,
+                'bank_1010'      => $bankOk,
+                'pos_cash_1020'  => $cashOk,
+                'ap_v01_2010'    => $apOk,
+                'equity_3010'    => $eqOk,
+                'balanced'       => $isBalanced,
+            ],
+            'details'      => [
+                'debits'  => $debits,
+                'credits' => $credits,
+            ],
+        ];
+    }
+
+    /**
      * Jalur Integrasi 4 (POS -> Inventory & Accounting — Real-Time Checkout):
-     * Dipicu secara otomatis saat transaksi keranjang kasir dibayar (`PosController::checkoutPosBasket()`).
-     * Mencatat Harga Pokok Penjualan (COGS: DR 5010 / CR 1130) serta Pendapatan POS
-     * (DR 1190 POS Settlement Clearing / CR 4020 POS Sales Revenue + CR 2030 Output VAT) secara seimbang (SR-13 & SR-21).
+     * Kebijakan Simulasi Khusus POS (Dua Fase Penulisan ke Database):
+     * - FASE 1 (Saat status 'Paid'): Sistem HANYA mem-posting Jurnal COGS (DR 5010 Beban HPP / CR 1130 Persediaan) tepat satu kali.
+     *   Pencatatan Penjualan (4020 Revenue), Pajak Keluaran (2030 PPN), dan mutasi Cash Drawer (1020) ditahan ke Fase 2 (Close Session).
      */
     public static function postPOSJournal(array $posData): array
     {
@@ -1966,7 +2042,7 @@ class AccountingController
 
         $journalLines = [];
 
-        // 1. Pencatatan Harga Pokok Penjualan (COGS): DR 5010 COGS / CR 1130 Stock Valuation
+        // FASE 1: Pencatatan HANYA Harga Pokok Penjualan (COGS): DR 5010 COGS / CR 1130 Stock Valuation tepat satu kali
         if ($totalCogs > 0) {
             $journalLines[] = [
                 'account_code' => '5010',
@@ -1984,46 +2060,13 @@ class AccountingController
             ];
         }
 
-        // 2. Pencatatan Pendapatan POS & PPN Keluaran terhadap Akun Perantara Kasir (1190 POS Settlement Clearing)
-        //    sehingga Pendapatan (4020) dan PPN (2030) tercatat real-time saat checkout, sedangkan laci kas (1020)
-        //    tetap direkonsiliasi saat penutupan sesi sesuai aturan SR-13 & SR-14.
-        if ($totalGross > 0) {
-            $journalLines[] = [
-                'account_code' => '1190',
-                'partner_id'   => $partnerId,
-                'debit'        => $totalGross,
-                'credit'       => 0.0,
-                'memo'         => sprintf('POS Settlement Clearing Receipt %s (%s)', $receiptNumber, $sessionNumber),
-            ];
-            if ($subtotalNet > 0) {
-                $journalLines[] = [
-                    'account_code' => '4020',
-                    'partner_id'   => $partnerId,
-                    'debit'        => 0.0,
-                    'credit'       => $subtotalNet,
-                    'memo'         => sprintf('POS Sales Revenue Receipt %s (%s)', $receiptNumber, $sessionNumber),
-                ];
-            }
-            if ($taxAmount > 0) {
-                $journalLines[] = [
-                    'account_code' => '2030',
-                    'partner_id'   => $partnerId,
-                    'debit'        => 0.0,
-                    'credit'       => $taxAmount,
-                    'memo'         => sprintf('Output VAT PPN 11%% POS Receipt %s (%s)', $receiptNumber, $sessionNumber),
-                ];
-            }
-        }
-
         $jeNumber = self::postBalancedJournal(
             $receiptNumber,
             sprintf(
-                'POS Paid Receipt %s (%s): COGS Rp%s & Pendapatan POS Net Rp%s (+PPN Rp%s) di %s',
+                'POS Paid Receipt %s (%s) Fase 1: Jurnal COGS Rp%s di %s',
                 $receiptNumber,
                 $sessionNumber,
                 number_format($totalCogs, 0, ',', '.'),
-                number_format($subtotalNet, 0, ',', '.'),
-                number_format($taxAmount, 0, ',', '.'),
                 $locationCode
             ),
             $journalLines
@@ -2034,6 +2077,7 @@ class AccountingController
             'http_code'            => 200,
             'outcome'              => 'ALLOWED',
             'rule'                 => 'SR-21',
+            'phase'                => 'Fase 1 (Stock Move & COGS Journal Only)',
             'receipt_number'       => $receiptNumber,
             'session_number'       => $sessionNumber,
             'location_code'        => $locationCode,
@@ -2042,6 +2086,7 @@ class AccountingController
             'total_gross'          => $totalGross,
             'total_cogs'           => $totalCogs,
             'journal_entry_number' => $jeNumber,
+            'cogs_je_number'       => $jeNumber,
             'lines'                => $journalLines,
         ];
     }

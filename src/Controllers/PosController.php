@@ -863,10 +863,14 @@ class PosController
             ];
         }
 
-        // 3. Posting Jurnal Settlement POS sekali saat sesi ditutup sah (SR-14, SR-21, T-31):
-        //    Karena postPOSJournal() saat checkout telah mencatat Pendapatan POS (4020) & PPN (2030) terhadap
-        //    akun perantara 1190 (POS Settlement Clearing), maka saat Close Session akun 1190 diselesaikan
-        //    ke 1020 (POS Cash Drawer) beserta selisih kas 5130 (Cash Over/Short) jika ada.
+        // 3. Kebijakan Simulasi Khusus POS - Fase 2 (Posting Jurnal Settlement Saat Close Session Sah):
+        //    Saat status 'Close Session' sah, sistem baru diizinkan mem-posting jurnal:
+        //    - DR 1020 POS Cash Drawer (mutasi kas fisik yang masuk dari tender kasir)
+        //    - CR 4020 POS Sales Revenue (pengakuan pendapatan penjualan POS)
+        //    - CR 2030 Output VAT (pajak keluaran PPN 11%)
+        //    - DR / CR 5130 Cash Over/Short (jika terdapat selisih kas yang disetujui Finance)
+        $netSales  = (float) $session['net_sales_revenue'];
+        $outputVat = (float) $session['output_vat'];
         $cashDelta = $cashTenders + $variance;
 
         $journalLines = [];
@@ -904,13 +908,22 @@ class PosController
                 'memo'         => sprintf('Cash Over (Selisih Lebih Kas) Sesi %s', $sessionNumber),
             ];
         }
-        if ($cashTenders > 0) {
+        if ($netSales > 0) {
             $journalLines[] = [
-                'account_code' => '1190',
-                'partner_id'   => null,
+                'account_code' => '4020',
+                'partner_id'   => 'C005',
                 'debit'        => 0.0,
-                'credit'       => $cashTenders,
-                'memo'         => sprintf('Clearing POS Settlement Sesi %s', $sessionNumber),
+                'credit'       => $netSales,
+                'memo'         => sprintf('Pengakuan Pendapatan POS Sales Sesi %s', $sessionNumber),
+            ];
+        }
+        if ($outputVat > 0) {
+            $journalLines[] = [
+                'account_code' => '2030',
+                'partner_id'   => 'C005',
+                'debit'        => 0.0,
+                'credit'       => $outputVat,
+                'memo'         => sprintf('PPN Keluaran POS Sesi %s', $sessionNumber),
             ];
         }
 

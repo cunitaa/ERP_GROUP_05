@@ -152,7 +152,6 @@ class RolePermissions
         self::ROLE_PROCUREMENT => [
             'Apps',
             'Purchase',
-            'Inventory',
         ],
         self::ROLE_FINANCE => [
             'Apps',
@@ -165,13 +164,118 @@ class RolePermissions
         self::ROLE_OWNER => [
             'Apps',
             'Accounting',
-            'Sales',
-            'CRM',
-            'Purchase',
-            'Inventory',
-            'Point of Sale',
+            'Dashboard',
+            'Governance',
         ],
     ];
+
+    /**
+     * Pemetaan Halaman / URL yang diizinkan per Stakeholder (Strict RBAC):
+     * - Budi Haryanto (Direktur / Owner): Akses HANYA ke Executive KPI Dashboard dan Halaman Audit/Laporan.
+     * - Putri Aulia (Sales): Akses HANYA ke modul Sales & CRM (Lead, Opportunity, Quotation, Sales Order).
+     * - Deni Pratama (Gudang / Warehouse): Akses HANYA ke modul Inventory (Delivery Order, Receipt, Reservasi, Mutasi Stok).
+     * - Mira Salsabila (Purchase / Procurement): Akses HANYA ke modul Purchase (RFQ, Purchase Order, Data Vendor).
+     * - Arif Firmansyah (Finance): Akses HANYA ke modul Accounting & Invoicing (Customer Invoice, Vendor Bill, Payment, Jurnal).
+     * - Rani Oktaviani (Kasir / Cashier): Akses HANYA ke modul Point of Sale (POS Basket, Open/Close Session, Cash Count).
+     */
+    public const STAKEHOLDER_ALLOWED_PAGES = [
+        self::ROLE_OWNER       => ['dashboard', 'governance', 'audit', 'reports'],
+        self::ROLE_SALES       => ['sales', 'crm'],
+        self::ROLE_WAREHOUSE   => ['inventory', 'warehouse', 'stock'],
+        self::ROLE_PROCUREMENT => ['purchase', 'procurement', 'rfq', 'po'],
+        self::ROLE_FINANCE     => ['accounting', 'finance', 'invoicing'],
+        self::ROLE_CASHIER     => ['pos', 'cashier', 'point_of_sale'],
+    ];
+
+    public const STAKEHOLDER_HOME = [
+        self::ROLE_OWNER       => ['page' => 'dashboard',  'module' => 'Dashboard',     'screen' => 'S-18', 'title' => 'Executive KPI Dashboard'],
+        self::ROLE_SALES       => ['page' => 'sales',      'module' => 'Sales',         'screen' => 'S-05', 'title' => 'Sales & CRM'],
+        self::ROLE_WAREHOUSE   => ['page' => 'inventory',  'module' => 'Inventory',     'screen' => 'S-06', 'title' => 'Inventory & Warehouse'],
+        self::ROLE_PROCUREMENT => ['page' => 'purchase',   'module' => 'Purchase',      'screen' => 'S-08', 'title' => 'Purchase'],
+        self::ROLE_FINANCE     => ['page' => 'accounting', 'module' => 'Accounting',    'screen' => 'S-10', 'title' => 'Accounting & Invoicing'],
+        self::ROLE_CASHIER     => ['page' => 'pos',        'module' => 'Point of Sale', 'screen' => 'S-15', 'title' => 'Point of Sale (POS)'],
+    ];
+
+    public const STAKEHOLDER_APP_TILES = [
+        self::ROLE_OWNER => [
+            [
+                'page'  => 'dashboard',
+                'name'  => 'Executive KPI',
+                'sub'   => 'Dasbor Direktur',
+                'icon'  => 'bi-speedometer2',
+                'bg'    => 'linear-gradient(135deg, #2C3E50 0%, #34495E 100%)',
+            ],
+            [
+                'page'  => 'governance',
+                'name'  => 'Audit & Laporan',
+                'sub'   => 'Jejak Audit & Kontrol',
+                'icon'  => 'bi-shield-check',
+                'bg'    => 'linear-gradient(135deg, #4A148C 0%, #7B1FA2 100%)',
+            ],
+        ],
+        self::ROLE_SALES => [
+            [
+                'page'  => 'sales',
+                'name'  => 'Sales & CRM',
+                'sub'   => 'Order to Cash',
+                'icon'  => 'bi-graph-up-arrow',
+                'bg'    => 'linear-gradient(135deg, #714B67 0%, #8E44AD 100%)',
+            ],
+        ],
+        self::ROLE_WAREHOUSE => [
+            [
+                'page'  => 'inventory',
+                'name'  => 'Inventory',
+                'sub'   => 'Gudang & Stok',
+                'icon'  => 'bi-boxes',
+                'bg'    => 'linear-gradient(135deg, #F06050 0%, #E67E22 100%)',
+            ],
+        ],
+        self::ROLE_PROCUREMENT => [
+            [
+                'page'  => 'purchase',
+                'name'  => 'Purchase',
+                'sub'   => 'Procure to Pay',
+                'icon'  => 'bi-cart-check-fill',
+                'bg'    => 'linear-gradient(135deg, #008784 0%, #27AE60 100%)',
+            ],
+        ],
+        self::ROLE_FINANCE => [
+            [
+                'page'  => 'accounting',
+                'name'  => 'Accounting & Invoicing',
+                'sub'   => 'Ledger & Faktur',
+                'icon'  => 'bi-journal-bookmark-fill',
+                'bg'    => 'linear-gradient(135deg, #0E6EB8 0%, #2980B9 100%)',
+            ],
+        ],
+        self::ROLE_CASHIER => [
+            [
+                'page'  => 'pos',
+                'name'  => 'Point of Sale',
+                'sub'   => 'Kasir Retail',
+                'icon'  => 'bi-shop',
+                'bg'    => 'linear-gradient(135deg, #00A09D 0%, #16A085 100%)',
+            ],
+        ],
+    ];
+
+    public static function isPageAllowedForRole(string $role, string $page): bool
+    {
+        $page = strtolower(trim($page));
+        $allowed = self::STAKEHOLDER_ALLOWED_PAGES[$role] ?? [];
+        return in_array($page, $allowed, true);
+    }
+
+    public static function getHomeForRole(string $role): array
+    {
+        return self::STAKEHOLDER_HOME[$role] ?? self::STAKEHOLDER_HOME[self::ROLE_SALES];
+    }
+
+    public static function getAppTilesForRole(string $role): array
+    {
+        return self::STAKEHOLDER_APP_TILES[$role] ?? self::STAKEHOLDER_APP_TILES[self::ROLE_SALES];
+    }
 
     /**
      * Definisi matriks aksi granular beserta modul dan role yang diizinkan.
@@ -434,14 +538,14 @@ class RolePermissions
             ],
             self::ROLE_PROCUREMENT => [
                 'Overview' => [
-                    ['code' => 'S-01', 'label' => 'Dashboard', 'module' => 'Apps'],
+                    ['code' => 'S-08', 'label' => 'Dashboard Purchase', 'module' => 'Purchase'],
                 ],
                 'Orders / Documents' => [
-                    ['code' => 'S-08', 'label' => 'Purchase Order', 'module' => 'Purchase'],
-                    ['code' => 'S-09', 'label' => 'Penerimaan Vendor', 'module' => 'Inventory'],
+                    ['code' => 'S-08', 'label' => 'Purchase Order (PO)', 'module' => 'Purchase'],
+                    ['code' => 'S-02', 'label' => 'Data Rekanan Vendor', 'module' => 'Purchase'],
                 ],
                 'Reporting' => [
-                    ['code' => 'S-03', 'label' => 'Katalog & Pricelist', 'module' => 'Inventory'],
+                    ['code' => 'S-03', 'label' => 'Vendor Pricelist', 'module' => 'Purchase'],
                 ],
                 'Configuration' => [
                     ['code' => 'CFG-PROC', 'label' => 'Master Vendor', 'module' => 'Purchase'],
@@ -486,19 +590,16 @@ class RolePermissions
             self::ROLE_OWNER => [
                 'Overview' => [
                     ['code' => 'S-18', 'label' => 'Dashboard Eksekutif', 'module' => 'Accounting'],
-                    ['code' => 'S-01', 'label' => 'Dashboard', 'module' => 'Apps'],
                 ],
                 'Orders / Documents' => [
-                    ['code' => 'S-05', 'label' => 'Audit O2C', 'module' => 'Sales'],
-                    ['code' => 'S-08', 'label' => 'Audit P2P', 'module' => 'Purchase'],
-                    ['code' => 'S-16', 'label' => 'Audit POS', 'module' => 'Point of Sale'],
+                    ['code' => 'S-18', 'label' => 'Jejak Audit Transaksi', 'module' => 'Accounting'],
                 ],
                 'Reporting' => [
+                    ['code' => 'S-18', 'label' => 'Laporan Eksekutif', 'module' => 'Accounting'],
                     ['code' => 'S-13', 'label' => 'Buku Besar & Neraca', 'module' => 'Accounting'],
-                    ['code' => 'S-07', 'label' => 'Valuasi Stok', 'module' => 'Inventory'],
                 ],
                 'Configuration' => [
-                    ['code' => 'CFG-GOV', 'label' => 'Audit Rules (SR)', 'module' => 'Accounting'],
+                    ['code' => 'CFG-GOV', 'label' => 'Tata Kelola (SR-18)', 'module' => 'Accounting'],
                 ],
             ],
         ];

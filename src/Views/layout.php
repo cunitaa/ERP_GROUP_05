@@ -24,6 +24,7 @@ $getPageForModule = static function (string $mod, string $code): string {
     if ($mod === 'Point of Sale') return 'pos';
     return 'dashboard';
 };
+$formatIdr      = static fn (float $amount): string => 'Rp ' . number_format($amount, 2, ',', '.');
 $activeView     = (string) ($vm['active_view'] ?? 'list');
 $searchQuery    = (string) ($vm['search_query'] ?? '');
 $activeFilter   = (string) ($vm['active_filter'] ?? 'all');
@@ -184,22 +185,28 @@ $canClosePosSession = RolePermissions::canPerformAction($role, 'pos.session.clos
         <!-- Ujung Kiri: Ikon App Switcher & Modul Aktif -->
         <div class="d-flex align-items-center gap-3">
             <div class="dropdown">
-                <button class="o-app-switcher-btn dropdown-toggle o-interactive" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <button class="o-app-switcher-btn dropdown-toggle o-interactive" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Home App Switcher (Odoo Web 17.0)">
                     <span>▦</span>
                     <span>Apps</span>
                 </button>
-                <ul class="dropdown-menu shadow-sm border-0 mt-2 py-2" style="min-width: 240px;">
-                    <li class="dropdown-header text-uppercase small fw-bold text-muted">Modul <?= htmlspecialchars($role) ?></li>
-                    <?php foreach ($allowedModules as $modKey => $modMeta): ?>
-                        <li>
-                            <a class="dropdown-item py-2 d-flex justify-content-between align-items-center o-interactive <?= $modKey === $activeModule ? 'active' : '' ?>"
-                               href="index.php?module=<?= urlencode((string) $modKey) ?>&view=<?= urlencode($activeView) ?>">
-                                <span><?= htmlspecialchars((string) ($modMeta['name'] ?? $modKey)) ?></span>
-                                <small class="opacity-75"><?= htmlspecialchars((string) ($modMeta['screen'] ?? '')) ?></small>
-                            </a>
-                        </li>
-                    <?php endforeach; ?>
-                </ul>
+                <div class="dropdown-menu shadow-lg border-0 mt-2 p-3" style="min-width: 360px; max-width: 420px; border-radius: 1rem;">
+                    <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                        <span class="text-uppercase small fw-bold text-muted" style="letter-spacing: 0.05em;">Home App Switcher</span>
+                        <span class="badge bg-light text-dark border"><?= htmlspecialchars($role) ?></span>
+                    </div>
+                    <div class="row g-2">
+                        <?php foreach (RolePermissions::getAppTilesForRole($role) as $tile): ?>
+                            <div class="col-6">
+                                <a href="index.php?page=<?= urlencode((string) $tile['page']) ?>" class="o-app-tile p-2 text-center h-100 <?= $activePage === $tile['page'] ? 'border-primary' : '' ?>">
+                                    <div class="o-app-tile-icon mx-auto mb-1" style="width: 42px; height: 42px; font-size: 1.25rem; background: <?= htmlspecialchars((string) $tile['bg']) ?>;">
+                                        <i class="bi <?= htmlspecialchars((string) $tile['icon']) ?>"></i>
+                                    </div>
+                                    <span class="o-app-tile-name" style="font-size: 0.78rem;"><?= htmlspecialchars((string) $tile['name']) ?></span>
+                                </a>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
             </div>
 
             <span class="o-navbar-brand"><?= htmlspecialchars($activeModule) ?></span>
@@ -449,6 +456,22 @@ $canClosePosSession = RolePermissions::canPerformAction($role, 'pos.session.clos
                 ];
             }
 
+            if ($role === 'Owner' || isset($allowedModules['Governance'])) {
+                $dashboardModuleCards[] = [
+                    'key'         => 'Governance',
+                    'icon'        => '🛡️',
+                    'title'       => 'Governance & Audit Trail',
+                    'screen'      => 'S-18 · SR-18 · SR-19 · SR-22',
+                    'status_text' => 'Audit Trail Aktif · Pengawasan Eksekutif Anti-Double Journal',
+                    'status_badge'=> 'Done',
+                    'summary'     => 'Pemantauan real-time jejak audit dokumen, pencegahan duplikasi jurnal POS/SO, dan integritas ACID multi-lokasi.',
+                    'primary_url' => 'index.php?page=governance&module=Accounting&screen=S-18&view=' . urlencode($activeView),
+                    'primary_lbl' => 'Buka Laporan & Audit →',
+                    'second_url'  => 'debug.php',
+                    'second_lbl'  => 'Halaman Uji',
+                ];
+            }
+
             // Daftar Dokumen Aktif yang difilter sesuai wewenang role aktif
             $roleActiveDocuments = [];
             if ($role === 'Sales' || $role === 'Owner') {
@@ -554,17 +577,67 @@ $canClosePosSession = RolePermissions::canPerformAction($role, 'pos.session.clos
 
             <div class="o-main-content d-flex flex-column gap-4">
 
+                <?php
+                $is403AccessDenied = (isset($accessViolation) && $accessViolation)
+                    || (is_array($flash) && (int) ($flash['http_code'] ?? 200) === 403)
+                    || (isset($flashResult) && is_array($flashResult) && (int) ($flashResult['http_code'] ?? 200) === 403);
+                $deniedMsg = (string) ($flashResult['reason'] ?? $flash['reason'] ?? $flashResult['message'] ?? $flash['message'] ?? 'Akses ke modul divisi lain ditolak (SR-18). Anda telah dialihkan kembali ke modul wewenang Anda.');
+                ?>
+                <?php if ($is403AccessDenied): ?>
+                    <div class="alert alert-danger alert-dismissible fade show rounded-4 shadow-sm border-0 p-3 mb-0" role="alert" style="background-color: #F8D7DA; color: #842029;">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="fs-3 text-danger"><i class="bi bi-shield-x"></i></div>
+                            <div class="flex-grow-1">
+                                <strong class="d-block mb-1">⛔ 403 Access Denied — Pembatasan Akses Antar Divisi (SR-18)</strong>
+                                <span class="small"><?= htmlspecialchars($deniedMsg) ?></span>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                <?php endif; ?>
+
                 <?php if ($activePage === 'dashboard'): ?>
                 <!-- =========================================================================
                      1. BERANDA DEFAULT / LANDING PAGE: DASHBOARD KPI EKSEKUTIF & CARD GRID
                      ========================================================================= -->
                 <div class="o-module-view o-spa-fade-in d-flex flex-column gap-4" id="view-dashboard">
+                    <!-- =========================================================================
+                         ODOO WEB 17.0 HOME APP SWITCHER GRID (NAVIGASI DASAR 6 MODUL BISNIS)
+                         ========================================================================= -->
+                    <section class="o-section-box bg-white rounded-4 shadow-sm p-4" id="home-apps-grid" data-testid="home-apps-grid">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 pb-2 border-bottom gap-2">
+                            <div>
+                                <span class="text-uppercase small fw-bold text-secondary d-block" style="letter-spacing: 0.06em;">
+                                    Home App Switcher (Odoo Web 17.0)
+                                </span>
+                                <span class="text-muted small">Pilih modul aplikasi untuk beralih ruang kerja operasional secara instan.</span>
+                            </div>
+                            <span class="badge bg-light text-secondary border px-3 py-1 rounded-pill">
+                                Hak Akses: <?= htmlspecialchars($stakeholderTitle) ?> (<?= htmlspecialchars($role) ?>)
+                            </span>
+                        </div>
+                        <div class="row g-3 row-cols-2 row-cols-sm-3 row-cols-md-6 o-app-launcher-grid">
+                            <?php foreach (RolePermissions::getAppTilesForRole($role) as $tile): ?>
+                                <div class="col">
+                                    <a href="index.php?page=<?= urlencode((string) $tile['page']) ?>" class="o-app-tile h-100 <?= $activePage === $tile['page'] ? 'border-primary' : '' ?>">
+                                        <div class="o-app-tile-icon" style="background: <?= htmlspecialchars((string) $tile['bg']) ?>;">
+                                            <i class="bi <?= htmlspecialchars((string) $tile['icon']) ?>"></i>
+                                        </div>
+                                        <span class="o-app-tile-name"><?= htmlspecialchars((string) $tile['name']) ?></span>
+                                        <span class="o-app-tile-sub"><?= htmlspecialchars((string) $tile['sub']) ?></span>
+                                    </a>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </section>
+
                     <?php require __DIR__ . DIRECTORY_SEPARATOR . 'exec_dashboard.php'; // SR-19: Dasbor Eksekutif jika Direktur/Finance ?>
 
                     <!-- =========================================================
-                         BAGIAN 1: DASHBOARD CARD GRID MODUL UTAMA (row + col-md-4)
+                         BAGIAN 1: DASHBOARD CARD GRID MODUL UTAMA
                      Hanya menampilkan kartu modul yang sesuai wewenang role aktif
                      ========================================================= -->
+                <?php if (!empty($dashboardModuleCards)): ?>
                 <section class="o-section-box bg-white rounded-4 shadow-sm">
                     <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 pb-2 border-bottom gap-2">
                         <div>
@@ -581,17 +654,24 @@ $canClosePosSession = RolePermissions::canPerformAction($role, 'pos.session.clos
                     </div>
 
                     <div class="row g-4">
+                        <?php
+                        $modCardCol = match(count($dashboardModuleCards)) {
+                            1 => 'col-12',
+                            2 => 'col-12 col-md-6',
+                            default => 'col-12 col-md-6 col-lg-4',
+                        };
+                        ?>
                         <?php foreach ($dashboardModuleCards as $mCard): ?>
                             <?php
                             $isCurrentMod = ($mCard['key'] === $activeModule)
                                 || ($mCard['key'] === 'Sales' && in_array($activeModule, ['Sales', 'CRM'], true));
                             ?>
-                            <div class="col-12 col-md-4">
+                            <div class="<?= $modCardCol ?>">
                                 <div class="card o-module-card bg-white rounded-4 shadow-sm h-100 d-flex flex-column justify-content-between <?= $isCurrentMod ? 'active-card' : '' ?>">
                                     <div>
                                         <!-- Header Kartu: Ikon Modul, Judul & Badge Layar -->
                                         <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
-                                            <div class="d-flex align-items-center gap-3">
+                                             <div class="d-flex align-items-center gap-3">
                                                 <div class="o-module-icon" aria-hidden="true">
                                                     <?= $mCard['icon'] ?>
                                                 </div>
@@ -637,6 +717,7 @@ $canClosePosSession = RolePermissions::canPerformAction($role, 'pos.session.clos
                         <?php endforeach; ?>
                     </div>
                 </section>
+                <?php endif; ?>
 
                                 <!-- =========================================================
                      BAGIAN 2: WADAH KOTAK TERPISAH — METRIK STOK & KINERJA PERAN
@@ -658,7 +739,7 @@ $canClosePosSession = RolePermissions::canPerformAction($role, 'pos.session.clos
 
                     <div class="row g-3">
                         <?php foreach ($roleKpis as $kpi): ?>
-                            <div class="col-12 col-sm-6 col-xl-3">
+                            <div class="col-12 col-sm-6 col-lg-3">
                                 <div class="o-kpi-card bg-white rounded-4 shadow-sm h-100">
                                     <div class="text-secondary small mb-1">
                                         <?= htmlspecialchars((string) ($kpi['label'] ?? '')) ?>
@@ -794,7 +875,7 @@ $canClosePosSession = RolePermissions::canPerformAction($role, 'pos.session.clos
                 <div class="o-module-view o-spa-fade-in d-flex flex-column gap-4" id="view-sales">
                     <section class="row g-4">
                         <!-- Kolom Kiri: CRM Pipeline (F-05) & Form Buat Quotation / Sales Order Baru (F-06..F-08) -->
-                        <div class="col-12 col-xl-5 d-flex flex-column gap-4">
+                        <div class="col-12 col-lg-5 d-flex flex-column gap-4">
                             <!-- CRM Pipeline (S-04 / F-05) -->
                             <div class="o-surface-card bg-white rounded-4 shadow-sm p-4">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -906,7 +987,7 @@ $canClosePosSession = RolePermissions::canPerformAction($role, 'pos.session.clos
                         </div>
 
                         <!-- Kolom Kanan: Daftar Sales Order & Penguncian Harga Otomatis (SR-07 & SR-08) -->
-                        <div class="col-12 col-xl-7">
+                        <div class="col-12 col-lg-7">
                             <div class="o-surface-card bg-white rounded-4 shadow-sm p-4 h-100">
                                 <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
                                     <div>
@@ -950,17 +1031,80 @@ $canClosePosSession = RolePermissions::canPerformAction($role, 'pos.session.clos
                                                 </div>
                                             </div>
 
-                                            <!-- Info Pelanggan, Baris Item, & Credit Exposure -->
+                                            <!-- Odoo 17.0 Smart Buttons (oe_button_box) -->
+                                            <div class="oe_button_box">
+                                                <a href="index.php?page=inventory&screen=S-06" class="oe_stat_button" title="Lihat Delivery Order di Modul Gudang">
+                                                    <i class="bi bi-truck text-primary"></i>
+                                                    <div>
+                                                        <span class="stat-number"><?= (int) ($firstLine['delivered_qty'] ?? 0) ?> / <?= $lineQty ?> pcs</span>
+                                                        <span class="stat-label">1 Delivery</span>
+                                                    </div>
+                                                </a>
+                                                <a href="index.php?page=accounting&screen=S-10" class="oe_stat_button" title="Lihat Customer Invoice di Modul Invoicing">
+                                                    <i class="bi bi-receipt text-success"></i>
+                                                    <div>
+                                                        <span class="stat-number"><?= (int) ($firstLine['invoiced_qty'] ?? 0) ?> / <?= $lineQty ?> pcs</span>
+                                                        <span class="stat-label">1 Invoice</span>
+                                                    </div>
+                                                </a>
+                                            </div>
+
+                                            <!-- Garis Besar Dokumen / Header SO (Odoo 17.0) -->
                                             <div class="row g-2 align-items-center small mb-2">
-                                                <div class="col-12 col-md-6 text-secondary">
+                                                <div class="col-12 col-md-7 text-secondary">
                                                     Pelanggan: <strong class="text-dark"><?= htmlspecialchars((string) ($so['customer_id'] ?? '')) ?> — <?= htmlspecialchars((string) ($so['customer_name'] ?? '')) ?></strong><br>
-                                                    Item: <strong><?= $lineQty ?> pcs <code><?= htmlspecialchars($lineSku) ?></code></strong> dari <code><?= htmlspecialchars((string) ($so['source_location'] ?? 'WH-PKU')) ?></code>
+                                                    Gudang Pengiriman: <code><?= htmlspecialchars((string) ($so['source_location'] ?? 'WH-PKU')) ?></code> ·
+                                                    Termin: <strong><?= htmlspecialchars((string) ($so['payment_terms'] ?? 'Immediate Payment')) ?></strong>
                                                 </div>
-                                                <div class="col-12 col-md-6 text-md-end text-secondary">
-                                                    Net: Rp<?= number_format((float) ($so['subtotal_net'] ?? 0), 0, ',', '.') ?> ·
-                                                    PPN 11%: Rp<?= number_format((float) ($so['tax_amount'] ?? 0), 0, ',', '.') ?> ·
-                                                    <strong class="text-dark">Gross: Rp<?= number_format((float) ($so['total_gross'] ?? 0), 0, ',', '.') ?></strong><br>
-                                                    <span>Credit Limit: Rp<?= number_format($custLim, 0, ',', '.') ?></span>
+                                                <div class="col-12 col-md-5 text-md-end text-secondary">
+                                                    Credit Limit: <strong><?= $formatIdr($custLim) ?></strong><br>
+                                                    Status Pajak: <span class="badge bg-light text-dark border">PKP Nonmewah (PPN 11%)</span>
+                                                </div>
+                                            </div>
+
+                                            <!-- Baris Produk di Bawah / Lines Detail (Odoo 17.0) -->
+                                            <div class="table-responsive my-2">
+                                                <table class="table table-sm table-striped table-hover align-middle mb-0" style="font-size: 0.78rem;">
+                                                    <thead class="table-light">
+                                                        <tr>
+                                                            <th>SKU Produk</th>
+                                                            <th class="text-center">Ordered</th>
+                                                            <th class="text-center">Delivered</th>
+                                                            <th class="text-center">Invoiced</th>
+                                                            <th class="text-end">Harga Satuan</th>
+                                                            <th class="text-center">Pajak</th>
+                                                            <th class="text-end">Subtotal (DPP)</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <tr>
+                                                            <td><code><?= htmlspecialchars($lineSku) ?></code></td>
+                                                            <td class="text-center"><?= $lineQty ?> pcs</td>
+                                                            <td class="text-center text-success"><?= (int) ($firstLine['delivered_qty'] ?? 0) ?> pcs</td>
+                                                            <td class="text-center text-primary"><?= (int) ($firstLine['invoiced_qty'] ?? 0) ?> pcs</td>
+                                                            <td class="text-end"><?= $formatIdr($linePrice) ?></td>
+                                                            <td class="text-center"><span class="badge bg-light text-dark border">PPN 11%</span></td>
+                                                            <td class="text-end fw-semibold"><?= $formatIdr((float) ($so['subtotal_net'] ?? 0)) ?></td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+
+                                            <!-- Ringkasan Finansial: DPP, PPN Keluaran, & Total Gross -->
+                                            <div class="d-flex justify-content-end text-end small mb-2">
+                                                <div class="p-2 rounded bg-light border" style="min-width: 270px; font-size: 0.76rem;">
+                                                    <div class="d-flex justify-content-between">
+                                                        <span class="text-muted">DPP (Net):</span>
+                                                        <span class="fw-semibold"><?= $formatIdr((float) ($so['subtotal_net'] ?? 0)) ?></span>
+                                                    </div>
+                                                    <div class="d-flex justify-content-between">
+                                                        <span class="text-muted">PPN Keluaran (11%):</span>
+                                                        <span><?= $formatIdr((float) ($so['tax_amount'] ?? 0)) ?></span>
+                                                    </div>
+                                                    <div class="d-flex justify-content-between border-top pt-1 mt-1 text-dark fw-bold">
+                                                        <span>Total Akhir (Gross):</span>
+                                                        <span class="text-success"><?= $formatIdr((float) ($so['total_gross'] ?? 0)) ?></span>
+                                                    </div>
                                                 </div>
                                             </div>
 
@@ -1006,6 +1150,33 @@ $canClosePosSession = RolePermissions::canPerformAction($role, 'pos.session.clos
                                                     </span>
                                                 </form>
                                             </div>
+
+                                            <!-- Odoo 17.0 Chatter / Log Notes Riwayat Dokumen -->
+                                            <div class="o-chatter-box mt-3">
+                                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                                    <span class="small fw-bold text-secondary text-uppercase" style="letter-spacing: 0.05em;">
+                                                        <i class="bi bi-clock-history me-1"></i> Log Notes &amp; Riwayat Dokumen
+                                                    </span>
+                                                    <span class="badge bg-white text-muted border">Chatter</span>
+                                                </div>
+                                                <div class="o-chatter-item">
+                                                    <div class="o-chatter-avatar"><i class="bi bi-person-fill"></i></div>
+                                                    <div class="o-chatter-content">
+                                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                                            <span class="fw-semibold small text-dark"><?= htmlspecialchars((string) ($so['created_by'] ?? 'Putri Aulia (Sales)')) ?></span>
+                                                            <span class="text-muted" style="font-size: 0.72rem;"><?= htmlspecialchars((string) ($so['order_date'] ?? date('Y-m-d H:i'))) ?></span>
+                                                        </div>
+                                                        <div class="small text-secondary">
+                                                            Dokumen <strong><?= htmlspecialchars($soNo) ?></strong> dibuat.
+                                                            <?php if ($soStat === 'Confirmed'): ?>
+                                                                Status diubah menjadi <span class="badge bg-success">Confirmed</span>. Stok <code><?= htmlspecialchars($lineSku) ?></code> (<?= $lineQty ?> pcs) dicadangkan otomatis di <code>WH-PKU</code> (SR-08/SR-09). Harga dan diskon terkunci read-only (SR-07).
+                                                            <?php else: ?>
+                                                                Status dokumen saat ini <span class="badge bg-secondary">Draft</span>. Menunggu konfirmasi pesanan.
+                                                            <?php endif; ?>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     <?php endforeach; ?>
                                 </div>
@@ -1023,7 +1194,7 @@ $canClosePosSession = RolePermissions::canPerformAction($role, 'pos.session.clos
                 <div class="o-module-view o-spa-fade-in d-flex flex-column gap-4" id="view-purchase">
                     <section class="row g-4">
                         <!-- Kolom Kiri: Form Pemesanan Vendor / Purchase Order (F-12, SR-20) & Form Penerimaan Barang (F-13, SR-10) -->
-                        <div class="col-12 col-xl-5 d-flex flex-column gap-4">
+                        <div class="col-12 col-lg-5 d-flex flex-column gap-4">
                             <!-- Form Purchase Order (S-08 / F-12 / SR-20) -->
                             <div class="o-surface-card bg-white rounded-4 shadow-sm p-4">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -1143,7 +1314,7 @@ $canClosePosSession = RolePermissions::canPerformAction($role, 'pos.session.clos
                         </div>
 
                         <!-- Kolom Kanan: Daftar Purchase Order & Kunci Harga Otomatis (SR-20 & SR-18) -->
-                        <div class="col-12 col-xl-7">
+                        <div class="col-12 col-lg-7">
                             <div class="o-surface-card bg-white rounded-4 shadow-sm p-4 h-100">
                                 <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
                                     <div>
@@ -1182,18 +1353,84 @@ $canClosePosSession = RolePermissions::canPerformAction($role, 'pos.session.clos
                                                 </div>
                                             </div>
 
+                                            <!-- Odoo 17.0 Smart Buttons (oe_button_box) -->
+                                            <div class="oe_button_box">
+                                                <a href="index.php?page=inventory&screen=S-07" class="oe_stat_button" title="Penerimaan Barang Gudang">
+                                                    <i class="bi bi-box-seam text-warning"></i>
+                                                    <div>
+                                                        <span class="stat-number"><?= $poAccQty > 0 ? "{$poAccQty} pcs Accepted" : 'Pending' ?></span>
+                                                        <span class="stat-label">1 Receipt</span>
+                                                    </div>
+                                                </a>
+                                                <a href="index.php?page=accounting&screen=S-12" class="oe_stat_button" title="Tagihan Pemasok (Vendor Bill)">
+                                                    <i class="bi bi-file-earmark-text text-danger"></i>
+                                                    <div>
+                                                        <span class="stat-number">Three-Way Match</span>
+                                                        <span class="stat-label">1 Vendor Bill</span>
+                                                    </div>
+                                                </a>
+                                            </div>
+
+                                            <!-- Garis Besar Dokumen / Header PO (Odoo 17.0) -->
                                             <div class="row g-2 align-items-center small mb-2">
-                                                <div class="col-12 col-md-6 text-secondary">
+                                                <div class="col-12 col-md-7 text-secondary">
                                                     Vendor: <strong class="text-dark"><?= htmlspecialchars((string) ($po['vendor_id'] ?? '')) ?> — <?= htmlspecialchars((string) ($po['vendor_name'] ?? '')) ?></strong><br>
-                                                    Item: <strong><?= $poOrdQty ?> pcs <code><?= htmlspecialchars($poSku) ?></code></strong> · Tujuan: <code><?= htmlspecialchars((string) ($po['destination_location'] ?? 'WH-PKU')) ?></code>
+                                                    Gudang Tujuan: <code><?= htmlspecialchars((string) ($po['destination_location'] ?? 'WH-PKU')) ?></code> ·
+                                                    Pricelist: <span class="badge bg-light text-dark border">vendor_pricelist</span>
+                                                </div>
+                                                <div class="col-12 col-md-5 text-md-end text-secondary">
+                                                    Status Penerimaan:
                                                     <?php if ($poAccQty > 0 || $poRejQty > 0): ?>
-                                                        <br><span class="text-success fw-semibold">Accepted: <?= $poAccQty ?> pcs</span> · <span class="text-danger">Rejected: <?= $poRejQty ?> pcs</span>
+                                                        <span class="text-success fw-semibold">Accepted: <?= $poAccQty ?> pcs</span> · <span class="text-danger">Rejected: <?= $poRejQty ?> pcs</span>
+                                                    <?php else: ?>
+                                                        <span class="text-muted">Menunggu Penerimaan</span>
                                                     <?php endif; ?>
                                                 </div>
-                                                <div class="col-12 col-md-6 text-md-end text-secondary">
-                                                    Net: Rp<?= number_format((float) ($po['subtotal_net'] ?? 0), 0, ',', '.') ?> ·
-                                                    PPN 11%: Rp<?= number_format((float) ($po['tax_amount'] ?? 0), 0, ',', '.') ?> ·
-                                                    <strong class="text-dark">Gross: Rp<?= number_format((float) ($po['total_gross'] ?? 0), 0, ',', '.') ?></strong>
+                                            </div>
+
+                                            <!-- Baris Produk di Bawah / Lines Detail (Odoo 17.0) -->
+                                            <div class="table-responsive my-2">
+                                                <table class="table table-sm table-striped table-hover align-middle mb-0" style="font-size: 0.78rem;">
+                                                    <thead class="table-light">
+                                                        <tr>
+                                                            <th>SKU Produk</th>
+                                                            <th class="text-center">Ordered</th>
+                                                            <th class="text-center">Accepted</th>
+                                                            <th class="text-center">Billed</th>
+                                                            <th class="text-end">Harga Beli</th>
+                                                            <th class="text-center">Pajak</th>
+                                                            <th class="text-end">Subtotal (DPP)</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <tr>
+                                                            <td><code><?= htmlspecialchars($poSku) ?></code></td>
+                                                            <td class="text-center"><?= $poOrdQty ?> pcs</td>
+                                                            <td class="text-center text-success"><?= $poAccQty ?> pcs</td>
+                                                            <td class="text-center text-primary"><?= (int) ($poLine['billed_qty'] ?? 0) ?> pcs</td>
+                                                            <td class="text-end"><?= $formatIdr($poPrice) ?></td>
+                                                            <td class="text-center"><span class="badge bg-light text-dark border">PPN 11%</span></td>
+                                                            <td class="text-end fw-semibold"><?= $formatIdr((float) ($po['subtotal_net'] ?? 0)) ?></td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+
+                                            <!-- Ringkasan Finansial: DPP, PPN Masukan, & Total Gross -->
+                                            <div class="d-flex justify-content-end text-end small mb-2">
+                                                <div class="p-2 rounded bg-light border" style="min-width: 270px; font-size: 0.76rem;">
+                                                    <div class="d-flex justify-content-between">
+                                                        <span class="text-muted">DPP Pembelian:</span>
+                                                        <span class="fw-semibold"><?= $formatIdr((float) ($po['subtotal_net'] ?? 0)) ?></span>
+                                                    </div>
+                                                    <div class="d-flex justify-content-between">
+                                                        <span class="text-muted">PPN Masukan (11%):</span>
+                                                        <span><?= $formatIdr((float) ($po['tax_amount'] ?? 0)) ?></span>
+                                                    </div>
+                                                    <div class="d-flex justify-content-between border-top pt-1 mt-1 text-dark fw-bold">
+                                                        <span>Total Tagihan (Gross):</span>
+                                                        <span class="text-success"><?= $formatIdr((float) ($po['total_gross'] ?? 0)) ?></span>
+                                                    </div>
                                                 </div>
                                             </div>
 
@@ -1228,6 +1465,33 @@ $canClosePosSession = RolePermissions::canPerformAction($role, 'pos.session.clos
                                                     </span>
                                                 </form>
                                             </div>
+
+                                            <!-- Odoo 17.0 Chatter / Log Notes Riwayat Dokumen -->
+                                            <div class="o-chatter-box mt-3">
+                                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                                    <span class="small fw-bold text-secondary text-uppercase" style="letter-spacing: 0.05em;">
+                                                        <i class="bi bi-clock-history me-1"></i> Log Notes &amp; Riwayat Dokumen
+                                                    </span>
+                                                    <span class="badge bg-white text-muted border">Chatter</span>
+                                                </div>
+                                                <div class="o-chatter-item">
+                                                    <div class="o-chatter-avatar"><i class="bi bi-person-fill"></i></div>
+                                                    <div class="o-chatter-content">
+                                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                                            <span class="fw-semibold small text-dark"><?= htmlspecialchars((string) ($po['created_by'] ?? 'Mira Salsabila (Procurement)')) ?></span>
+                                                            <span class="text-muted" style="font-size: 0.72rem;"><?= htmlspecialchars((string) ($po['order_date'] ?? date('Y-m-d H:i'))) ?></span>
+                                                        </div>
+                                                        <div class="small text-secondary">
+                                                            Dokumen <strong><?= htmlspecialchars($poNo) ?></strong> dibuat.
+                                                            <?php if ($poStat === 'Confirmed'): ?>
+                                                                Status diubah menjadi <span class="badge bg-success">Confirmed</span>. Harga beli dikunci sebesar Rp<?= number_format($poPrice, 0, ',', '.') ?> dari <code>vendor_pricelist</code> (SR-20). Menunggu barang tiba di <code>WH-PKU</code>.
+                                                            <?php else: ?>
+                                                                Status dokumen saat ini <span class="badge bg-secondary"><?= htmlspecialchars($poStat) ?></span>.
+                                                            <?php endif; ?>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     <?php endforeach; ?>
                                 </div>
@@ -1245,7 +1509,7 @@ $canClosePosSession = RolePermissions::canPerformAction($role, 'pos.session.clos
                 <div class="o-module-view o-spa-fade-in d-flex flex-column gap-4" id="view-inventory">
                     <section class="row g-4">
                         <!-- 1. Form Delivery Order & Backorder (F-09, F-10, SR-09, S-06) -->
-                        <div class="col-12 col-xl-4">
+                        <div class="col-12 col-md-6 col-lg-4">
                             <div class="o-surface-card bg-white rounded-4 shadow-sm p-4 h-100">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
                                     <span class="fw-bold text-dark">Delivery Order &amp; Backorder (F-10 · S-06)</span>
@@ -1292,7 +1556,7 @@ $canClosePosSession = RolePermissions::canPerformAction($role, 'pos.session.clos
                         </div>
 
                         <!-- 2. Form Penerimaan Barang / Quality Acceptance (F-13, SR-10, S-09) -->
-                        <div class="col-12 col-xl-4">
+                        <div class="col-12 col-md-6 col-lg-4">
                             <div class="o-surface-card bg-white rounded-4 shadow-sm p-4 h-100">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
                                     <span class="fw-bold text-dark">Receipt &amp; Quality Acceptance (F-13 · S-09)</span>
@@ -1343,7 +1607,7 @@ $canClosePosSession = RolePermissions::canPerformAction($role, 'pos.session.clos
                         </div>
 
                         <!-- 3. Form Internal Transfer Antar Gudang/Toko (F-21, SR-17, S-07) -->
-                        <div class="col-12 col-xl-4">
+                        <div class="col-12 col-md-6 col-lg-4">
                             <div class="o-surface-card bg-white rounded-4 shadow-sm p-4 h-100">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
                                     <span class="fw-bold text-dark">Internal Transfer (F-21 · S-07)</span>
@@ -1420,7 +1684,7 @@ $canClosePosSession = RolePermissions::canPerformAction($role, 'pos.session.clos
                 <div class="o-module-view o-spa-fade-in d-flex flex-column gap-4" id="view-accounting">
                     <section class="row g-4">
                         <!-- 1. Customer Invoice atas Delivered Qty (F-11 · SR-02 vs SR-01 · S-10) -->
-                        <div class="col-12 col-xl-6">
+                        <div class="col-12 col-lg-6">
                             <div class="o-surface-card bg-white rounded-4 shadow-sm p-4 h-100">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <span class="fw-bold text-dark">Customer Invoice — Penagihan B2B (F-11 · S-10)</span>
@@ -1478,7 +1742,7 @@ $canClosePosSession = RolePermissions::canPerformAction($role, 'pos.session.clos
                         </div>
 
                         <!-- 2. Vendor Bill 3-Way Match & Purchase Price Variance (F-14 · SR-06 vs SR-05 · S-11) -->
-                        <div class="col-12 col-xl-6">
+                        <div class="col-12 col-lg-6">
                             <div class="o-surface-card bg-white rounded-4 shadow-sm p-4 h-100">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <span class="fw-bold text-dark">Vendor Bill — Three-Way Match &amp; PPV (F-14 · S-11)</span>
@@ -1536,7 +1800,7 @@ $canClosePosSession = RolePermissions::canPerformAction($role, 'pos.session.clos
                         </div>
 
                         <!-- 3. Register Partial Payment & Reconciliation (F-15 · SR-15 · S-12) -->
-                        <div class="col-12 col-xl-6">
+                        <div class="col-12 col-lg-6">
                             <div class="o-surface-card bg-white rounded-4 shadow-sm p-4 h-100">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <span class="fw-bold text-dark">Register Partial Payment &amp; Reconciliation (F-15 · S-12)</span>
@@ -1563,7 +1827,7 @@ $canClosePosSession = RolePermissions::canPerformAction($role, 'pos.session.clos
                         </div>
 
                         <!-- 4. B2B Return & Credit Note (F-20 · SR-16 · S-17) -->
-                        <div class="col-12 col-xl-6">
+                        <div class="col-12 col-lg-6">
                             <div class="o-surface-card bg-white rounded-4 shadow-sm p-4 h-100">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <span class="fw-bold text-dark">B2B Sales Return &amp; Credit Note (F-20 · S-17)</span>
@@ -1645,7 +1909,7 @@ $canClosePosSession = RolePermissions::canPerformAction($role, 'pos.session.clos
                         </div>
 
                         <!-- 1. Keranjang Belanja POS STORE-PKU / STORE-DUM (F-18 · SR-04 & SR-13 · S-15) -->
-                        <div class="col-12 col-xl-4">
+                        <div class="col-12 col-md-6 col-lg-4">
                             <div class="o-surface-card bg-white rounded-4 shadow-sm p-4 h-100">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <span class="fw-bold text-dark">Keranjang Belanja POS Toko (F-18 · S-15)</span>
@@ -1694,7 +1958,7 @@ $canClosePosSession = RolePermissions::canPerformAction($role, 'pos.session.clos
                         </div>
 
                         <!-- 2. Retur & Cash Refund POS (F-20 · SR-16 · S-17) -->
-                        <div class="col-12 col-xl-4">
+                        <div class="col-12 col-md-6 col-lg-4">
                             <div class="o-surface-card bg-white rounded-4 shadow-sm p-4 h-100">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <span class="fw-bold text-dark">POS Cash Refund &amp; Restock (F-20 · S-17)</span>
@@ -1727,7 +1991,7 @@ $canClosePosSession = RolePermissions::canPerformAction($role, 'pos.session.clos
                         </div>
 
                         <!-- 3. Rekonsiliasi Kas & Penutupan Sesi POS (F-19 · SR-11 vs SR-12 & SR-14 · S-16) -->
-                        <div class="col-12 col-xl-4">
+                        <div class="col-12 col-md-6 col-lg-4">
                             <div class="o-surface-card bg-white rounded-4 shadow-sm p-4 h-100">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <span class="fw-bold text-dark">Rekonsiliasi Kas &amp; Tutup Sesi (F-19 · S-16)</span>
@@ -1775,7 +2039,7 @@ $canClosePosSession = RolePermissions::canPerformAction($role, 'pos.session.clos
                 <div class="o-module-view o-spa-fade-in d-flex flex-column gap-4" id="view-governance">
                     <?php require __DIR__ . DIRECTORY_SEPARATOR . 'exec_dashboard.php'; ?>
                     <section class="row g-4">
-                        <div class="col-12 col-xl-6">
+                        <div class="col-12 col-lg-6">
                             <div class="o-surface-card bg-white rounded-4 shadow-sm p-4 h-100">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
                                     <span class="fw-bold text-dark">Dasbor Analitik Real-Time ReportController (F-22 · SR-19 · S-18)</span>
@@ -1821,7 +2085,7 @@ $canClosePosSession = RolePermissions::canPerformAction($role, 'pos.session.clos
                             </div>
                         </div>
 
-                        <div class="col-12 col-xl-6">
+                        <div class="col-12 col-lg-6">
                             <div class="o-surface-card bg-white rounded-4 shadow-sm p-4 h-100">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
                                     <span class="fw-bold text-dark">Audit Trail Mutlak &amp; Pencegahan Jurnal Ganda (F-23 · SR-18 · SR-22)</span>
@@ -2083,46 +2347,234 @@ $canClosePosSession = RolePermissions::canPerformAction($role, 'pos.session.clos
                         </div>
 
                     <?php else: ?>
-                        <!-- ==================== FORM VIEW DENGAN STATUSBAR PIPELINE & BADGE WARNA ==================== -->
+                        <!-- ==================== FORM VIEW ODOO WEB 17.0 (STATUSBAR, SMART BUTTONS, SHEET & LOG NOTES) ==================== -->
                         <div class="p-4">
-                            <div class="o-form-sheet">
+                            <div class="o-form-sheet bg-white rounded-4 shadow-sm border p-4">
                                 <?php if ($role === 'Procurement'): ?>
                                     <?php
                                     $poDoc    = (array) ($docStates['PO00007'] ?? []);
                                     $poStatus = (string) ($poDoc['status'] ?? 'Confirmed');
                                     ?>
-                                    <div class="d-flex flex-wrap justify-content-between align-items-center pb-3 mb-4 border-bottom gap-2">
-                                        <div class="d-flex align-items-center gap-2">
-                                            <span class="badge <?= $getStatusBadgeClass($poStatus) ?>"><?= htmlspecialchars($poStatus) ?></span>
-                                            <h3 class="h5 fw-bold mb-0"><?= htmlspecialchars((string) ($poDoc['po_number'] ?? 'PO00007')) ?></h3>
+                                    <!-- 1. Form Header Actions & Statusbar -->
+                                    <div class="d-flex flex-wrap justify-content-between align-items-center pb-3 mb-3 border-bottom gap-2">
+                                        <div class="d-flex flex-wrap align-items-center gap-2">
+                                            <button type="button" class="btn btn-sm btn-pastel o-interactive">✓ Confirm Order</button>
+                                            <button type="button" class="btn btn-sm btn-soft-gray o-interactive">Print RFQ</button>
+                                            <button type="button" class="btn btn-sm btn-soft-gray o-interactive text-danger">Cancel</button>
                                         </div>
                                         <div class="o-statusbar">
-                                            <span class="o-statusbar-step">RFQ</span>
-                                            <span class="o-statusbar-step current">Confirmed</span>
-                                            <span class="o-statusbar-step">Done</span>
+                                            <span class="o-statusbar-step <?= $poStatus === 'RFQ' ? 'current' : '' ?>">RFQ</span>
+                                            <span class="o-statusbar-step <?= $poStatus === 'Confirmed' ? 'current' : '' ?>">Confirmed</span>
+                                            <span class="o-statusbar-step <?= in_array($poStatus, ['Received', 'Done'], true) ? 'current' : '' ?>">Done</span>
                                         </div>
                                     </div>
-                                    <p class="mb-2"><strong>Vendor:</strong> V01 — PT Pangan Pilihan (Pekanbaru · NET 30)</p>
-                                    <p class="mb-0 text-secondary">30 pcs MIE-GOR-80 @Rp3.000 · Net Rp90.000 · PPN 11% Rp9.900 · <strong class="text-dark">Gross Rp99.900</strong></p>
+
+                                    <!-- 2. Smart Buttons Box (oe_button_box) -->
+                                    <div class="oe_button_box mb-3">
+                                        <a href="index.php?page=inventory&screen=S-07" class="oe_stat_button" title="Penerimaan Barang Gudang">
+                                            <i class="bi bi-box-seam text-warning"></i>
+                                            <div>
+                                                <span class="stat-number">1 Receipt</span>
+                                                <span class="stat-label">Accepted 25 pcs</span>
+                                            </div>
+                                        </a>
+                                        <a href="index.php?page=accounting&screen=S-12" class="oe_stat_button" title="Tagihan Pemasok / Vendor Bill">
+                                            <i class="bi bi-file-earmark-text text-danger"></i>
+                                            <div>
+                                                <span class="stat-number">1 Vendor Bill</span>
+                                                <span class="stat-label">Three-Way Match</span>
+                                            </div>
+                                        </a>
+                                    </div>
+
+                                    <!-- 3. Form Document Sheet (Header-Detail) -->
+                                    <div class="mb-4">
+                                        <div class="d-flex align-items-center gap-2 mb-2">
+                                            <span class="badge <?= $getStatusBadgeClass($poStatus) ?>"><?= htmlspecialchars($poStatus) ?></span>
+                                            <h2 class="h4 fw-bold mb-0 text-dark"><?= htmlspecialchars((string) ($poDoc['po_number'] ?? 'PO00007')) ?></h2>
+                                            <span class="badge bg-secondary">🔒 Harga Terkunci (Pricelist · SR-20)</span>
+                                        </div>
+                                        <div class="row g-3 py-2">
+                                            <div class="col-12 col-md-6">
+                                                <table class="table table-sm table-borderless small mb-0">
+                                                    <tr>
+                                                        <td class="text-secondary" style="width:120px;">Vendor:</td>
+                                                        <td><strong class="text-dark">V01 — PT Pangan Pilihan</strong></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="text-secondary">Lokasi Tujuan:</td>
+                                                        <td><code>WH-PKU</code> (Gudang Pusat Pekanbaru)</td>
+                                                    </tr>
+                                                </table>
+                                            </div>
+                                            <div class="col-12 col-md-6">
+                                                <table class="table table-sm table-borderless small mb-0">
+                                                    <tr>
+                                                        <td class="text-secondary" style="width:120px;">Termin Bayar:</td>
+                                                        <td><strong class="text-dark">NET 30</strong></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="text-secondary">Tanggal Dokumen:</td>
+                                                        <td><?= date('Y-m-d') ?></td>
+                                                    </tr>
+                                                </table>
+                                            </div>
+                                        </div>
+
+                                        <!-- Product Lines Table -->
+                                        <div class="table-responsive my-3 border rounded-3 overflow-hidden">
+                                            <table class="table table-sm table-striped align-middle mb-0 small">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th>Produk / SKU</th>
+                                                        <th class="text-center">Ordered</th>
+                                                        <th class="text-center">Received</th>
+                                                        <th class="text-end">Harga Beli</th>
+                                                        <th class="text-center">Pajak</th>
+                                                        <th class="text-end">Subtotal</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                        <td><code>MIE-GOR-80</code> — Indomie Goreng 80g</td>
+                                                        <td class="text-center">30 pcs</td>
+                                                        <td class="text-center text-success">25 Accepted (5 Rejected)</td>
+                                                        <td class="text-end"><?= $formatIdr(3000) ?></td>
+                                                        <td class="text-center"><span class="badge bg-light text-dark border">PPN 11%</span></td>
+                                                        <td class="text-end fw-semibold"><?= $formatIdr(90000) ?></td>
+                                                    </tr>
+                                                </tbody>
+                                                <tfoot class="table-light">
+                                                    <tr>
+                                                        <td colspan="5" class="text-end text-muted">DPP:</td>
+                                                        <td class="text-end fw-semibold"><?= $formatIdr(90000) ?></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td colspan="5" class="text-end text-muted">PPN Masukan (11%):</td>
+                                                        <td class="text-end"><?= $formatIdr(9900) ?></td>
+                                                    </tr>
+                                                    <tr class="fw-bold">
+                                                        <td colspan="5" class="text-end">Total Gross:</td>
+                                                        <td class="text-end text-success"><?= $formatIdr(99900) ?></td>
+                                                    </tr>
+                                                </tfoot>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                    <!-- 4. Log Notes / Chatter -->
+                                    <div class="o-chatter-box">
+                                        <div class="d-flex align-items-center justify-content-between mb-3">
+                                            <span class="small fw-bold text-secondary text-uppercase" style="letter-spacing: 0.05em;">
+                                                <i class="bi bi-clock-history me-1"></i> Log Notes &amp; Riwayat Dokumen
+                                            </span>
+                                            <span class="badge bg-white text-muted border">Odoo Chatter</span>
+                                        </div>
+                                        <div class="o-chatter-item">
+                                            <div class="o-chatter-avatar"><i class="bi bi-person-fill"></i></div>
+                                            <div class="o-chatter-content">
+                                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                                    <span class="fw-semibold small text-dark">Mira Salsabila (Procurement)</span>
+                                                    <span class="text-muted" style="font-size: 0.72rem;"><?= date('Y-m-d H:i') ?></span>
+                                                </div>
+                                                <div class="small text-secondary">
+                                                    Purchase Order <strong><?= htmlspecialchars((string) ($poDoc['po_number'] ?? 'PO00007')) ?></strong> dikonfirmasi. Harga beli dikunci sebesar Rp3.000/pcs dari <code>vendor_pricelist</code> (SR-20). Menunggu barang diterima staf Gudang.
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
 
                                 <?php elseif ($role === 'Cashier'): ?>
                                     <?php
                                     $posDoc    = (array) ($docStates['POS-SESSION-0001'] ?? []);
                                     $posStatus = (string) ($posDoc['status'] ?? 'Open');
                                     ?>
-                                    <div class="d-flex flex-wrap justify-content-between align-items-center pb-3 mb-4 border-bottom gap-2">
-                                        <div class="d-flex align-items-center gap-2">
-                                            <span class="badge <?= $getStatusBadgeClass($posStatus) ?>"><?= htmlspecialchars($posStatus) ?></span>
-                                            <h3 class="h5 fw-bold mb-0"><?= htmlspecialchars((string) ($posDoc['session_number'] ?? 'POS-SESSION-0001')) ?></h3>
+                                    <!-- 1. Form Header Actions & Statusbar -->
+                                    <div class="d-flex flex-wrap justify-content-between align-items-center pb-3 mb-3 border-bottom gap-2">
+                                        <div class="d-flex flex-wrap align-items-center gap-2">
+                                            <button type="button" class="btn btn-sm btn-pastel o-interactive">Lanjutkan Penjualan</button>
+                                            <button type="button" class="btn btn-sm btn-soft-gray o-interactive text-danger">Tutup Sesi (Close Session)</button>
                                         </div>
                                         <div class="o-statusbar">
-                                            <span class="o-statusbar-step current">Open</span>
-                                            <span class="o-statusbar-step">Pending Approval</span>
-                                            <span class="o-statusbar-step">Closed</span>
+                                            <span class="o-statusbar-step <?= $posStatus === 'Open' ? 'current' : '' ?>">Open</span>
+                                            <span class="o-statusbar-step <?= $posStatus === 'Pending Approval' ? 'current' : '' ?>">Pending Approval</span>
+                                            <span class="o-statusbar-step <?= $posStatus === 'Closed' ? 'current' : '' ?>">Closed</span>
                                         </div>
                                     </div>
-                                    <p class="mb-2"><strong>Lokasi / Register:</strong> STORE-PKU · Register POS01 · Kasir: Rani Oktaviani</p>
-                                    <p class="mb-0 text-secondary">Opening Cash Drawer: <strong class="text-dark">Rp200.000</strong></p>
+
+                                    <!-- 2. Smart Buttons Box -->
+                                    <div class="oe_button_box mb-3">
+                                        <a href="index.php?page=pos&screen=S-15" class="oe_stat_button" title="Daftar Struk Kasir">
+                                            <i class="bi bi-receipt text-primary"></i>
+                                            <div>
+                                                <span class="stat-number">1 Struk Terbayar</span>
+                                                <span class="stat-label">Paid Receipts</span>
+                                            </div>
+                                        </a>
+                                        <a href="index.php?page=pos&screen=S-16" class="oe_stat_button" title="Laci Uang Kasir">
+                                            <i class="bi bi-cash-stack text-success"></i>
+                                            <div>
+                                                <span class="stat-number">Rp200.000</span>
+                                                <span class="stat-label">Opening Drawer</span>
+                                            </div>
+                                        </a>
+                                    </div>
+
+                                    <!-- 3. Form Document Sheet -->
+                                    <div class="mb-4">
+                                        <div class="d-flex align-items-center gap-2 mb-2">
+                                            <span class="badge <?= $getStatusBadgeClass($posStatus) ?>"><?= htmlspecialchars($posStatus) ?></span>
+                                            <h2 class="h4 fw-bold mb-0 text-dark"><?= htmlspecialchars((string) ($posDoc['session_number'] ?? 'POS-SESSION-0001')) ?></h2>
+                                        </div>
+                                        <div class="row g-3 py-2">
+                                            <div class="col-12 col-md-6">
+                                                <table class="table table-sm table-borderless small mb-0">
+                                                    <tr>
+                                                        <td class="text-secondary" style="width:140px;">Lokasi Kasir:</td>
+                                                        <td><strong class="text-dark">STORE-PKU</strong> (Toko Retail Pekanbaru)</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="text-secondary">Nama Kasir:</td>
+                                                        <td>Rani Oktaviani</td>
+                                                    </tr>
+                                                </table>
+                                            </div>
+                                            <div class="col-12 col-md-6">
+                                                <table class="table table-sm table-borderless small mb-0">
+                                                    <tr>
+                                                        <td class="text-secondary" style="width:140px;">Opening Cash:</td>
+                                                        <td><strong class="text-dark"><?= $formatIdr(200000) ?></strong></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="text-secondary">Waktu Dibuka:</td>
+                                                        <td><?= date('Y-m-d H:i') ?></td>
+                                                    </tr>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- 4. Log Notes / Chatter -->
+                                    <div class="o-chatter-box">
+                                        <div class="d-flex align-items-center justify-content-between mb-3">
+                                            <span class="small fw-bold text-secondary text-uppercase" style="letter-spacing: 0.05em;">
+                                                <i class="bi bi-clock-history me-1"></i> Log Notes &amp; Riwayat Dokumen
+                                            </span>
+                                            <span class="badge bg-white text-muted border">Odoo Chatter</span>
+                                        </div>
+                                        <div class="o-chatter-item">
+                                            <div class="o-chatter-avatar"><i class="bi bi-person-fill"></i></div>
+                                            <div class="o-chatter-content">
+                                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                                    <span class="fw-semibold small text-dark">Rani Oktaviani (Cashier)</span>
+                                                    <span class="text-muted" style="font-size: 0.72rem;"><?= date('Y-m-d H:i') ?></span>
+                                                </div>
+                                                <div class="small text-secondary">
+                                                    Sesi kasir <strong>POS-SESSION-0001</strong> dibuka dengan saldo modal awal Rp200.000. Pengurangan stok fisik toko dilakukan secara real-time pada saat struk berstatus Paid.
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
 
                                 <?php else: ?>
                                     <?php
@@ -2131,29 +2583,139 @@ $canClosePosSession = RolePermissions::canPerformAction($role, 'pos.session.clos
                                     $soStatus = (string) ($soDoc['status'] ?? 'Confirmed');
                                     $isLocked = (bool) ($soDoc['price_locked'] ?? true) || $soStatus === 'Confirmed';
                                     ?>
-                                    <div class="d-flex flex-wrap justify-content-between align-items-center pb-3 mb-4 border-bottom gap-2">
-                                        <div class="d-flex align-items-center gap-2">
+                                    <!-- 1. Form Header Actions & Statusbar -->
+                                    <div class="d-flex flex-wrap justify-content-between align-items-center pb-3 mb-3 border-bottom gap-2">
+                                        <div class="d-flex flex-wrap align-items-center gap-2">
+                                            <button type="button" class="btn btn-sm btn-pastel o-interactive">✓ Confirm Order</button>
+                                            <button type="button" class="btn btn-sm btn-soft-gray o-interactive">Create Invoice</button>
+                                            <button type="button" class="btn btn-sm btn-soft-gray o-interactive">Send by Email</button>
+                                            <button type="button" class="btn btn-sm btn-soft-gray o-interactive text-danger">Cancel</button>
+                                        </div>
+                                        <div class="o-statusbar">
+                                            <span class="o-statusbar-step <?= $soStatus === 'Draft' ? 'current' : '' ?>">Draft</span>
+                                            <span class="o-statusbar-step <?= $soStatus === 'Confirmed' ? 'current' : '' ?>">Confirmed</span>
+                                            <span class="o-statusbar-step <?= in_array($soStatus, ['Done', 'Delivered'], true) ? 'current' : '' ?>">Done</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- 2. Smart Buttons Box (oe_button_box) -->
+                                    <div class="oe_button_box mb-3">
+                                        <a href="index.php?page=inventory&screen=S-06" class="oe_stat_button" title="Lihat Delivery Order di Modul Gudang">
+                                            <i class="bi bi-truck text-primary"></i>
+                                            <div>
+                                                <span class="stat-number">1 Delivery</span>
+                                                <span class="stat-label">Reserved 8 pcs</span>
+                                            </div>
+                                        </a>
+                                        <a href="index.php?page=accounting&screen=S-10" class="oe_stat_button" title="Lihat Customer Invoice di Modul Invoicing">
+                                            <i class="bi bi-receipt text-success"></i>
+                                            <div>
+                                                <span class="stat-number">1 Invoice</span>
+                                                <span class="stat-label">To Invoice</span>
+                                            </div>
+                                        </a>
+                                    </div>
+
+                                    <!-- 3. Form Document Sheet (Header-Detail) -->
+                                    <div class="mb-4">
+                                        <div class="d-flex align-items-center gap-2 mb-2">
                                             <span class="badge <?= $getStatusBadgeClass($soStatus) ?>"><?= htmlspecialchars($soStatus) ?></span>
-                                            <h3 class="h5 fw-bold mb-0"><?= htmlspecialchars((string) ($soDoc['so_number'] ?? 'S00007')) ?></h3>
+                                            <h2 class="h4 fw-bold mb-0 text-dark"><?= htmlspecialchars((string) ($soDoc['so_number'] ?? 'S00007')) ?></h2>
                                             <?php if ($isLocked): ?>
                                                 <span class="badge bg-secondary">🔒 Harga Terkunci (Read-Only · SR-07)</span>
                                             <?php endif; ?>
                                         </div>
-                                        <div class="o-statusbar">
-                                            <span class="o-statusbar-step">Draft</span>
-                                            <span class="o-statusbar-step current">Confirmed</span>
-                                            <span class="o-statusbar-step">Done</span>
+                                        <div class="row g-3 py-2">
+                                            <div class="col-12 col-md-6">
+                                                <table class="table table-sm table-borderless small mb-0">
+                                                    <tr>
+                                                        <td class="text-secondary" style="width:130px;">Pelanggan:</td>
+                                                        <td><strong class="text-dark"><?= htmlspecialchars((string) ($custDoc['id'] ?? 'C001')) ?> — <?= htmlspecialchars((string) ($custDoc['name'] ?? 'Warung Kopi Pasar')) ?></strong></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="text-secondary">Gudang Sumber:</td>
+                                                        <td><code>WH-PKU</code> (Gudang Distribusi Pekanbaru)</td>
+                                                    </tr>
+                                                </table>
+                                            </div>
+                                            <div class="col-12 col-md-6">
+                                                <table class="table table-sm table-borderless small mb-0">
+                                                    <tr>
+                                                        <td class="text-secondary" style="width:130px;">Termin Bayar:</td>
+                                                        <td><strong class="text-dark">Immediate Payment</strong></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="text-secondary">Credit Limit:</td>
+                                                        <td><?= $formatIdr((float) ($custDoc['credit_limit'] ?? 500000)) ?></td>
+                                                    </tr>
+                                                </table>
+                                            </div>
+                                        </div>
+
+                                        <!-- Product Lines Table -->
+                                        <div class="table-responsive my-3 border rounded-3 overflow-hidden">
+                                            <table class="table table-sm table-striped align-middle mb-0 small">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th>Produk / SKU</th>
+                                                        <th class="text-center">Ordered</th>
+                                                        <th class="text-center">Delivered</th>
+                                                        <th class="text-center">Invoiced</th>
+                                                        <th class="text-end">Harga Satuan</th>
+                                                        <th class="text-center">Pajak</th>
+                                                        <th class="text-end">Subtotal</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                        <td><code>AIR-600</code> — Air Mineral 600ml</td>
+                                                        <td class="text-center">8 pcs</td>
+                                                        <td class="text-center text-success">8 pcs (Reserved)</td>
+                                                        <td class="text-center text-muted">0 pcs</td>
+                                                        <td class="text-end"><?= $formatIdr(4000) ?></td>
+                                                        <td class="text-center"><span class="badge bg-light text-dark border">PPN 11%</span></td>
+                                                        <td class="text-end fw-semibold"><?= $formatIdr(32000) ?></td>
+                                                    </tr>
+                                                </tbody>
+                                                <tfoot class="table-light">
+                                                    <tr>
+                                                        <td colspan="5" class="text-end text-muted">DPP Penjualan:</td>
+                                                        <td class="text-end fw-semibold"><?= $formatIdr(32000) ?></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td colspan="5" class="text-end text-muted">PPN Keluaran (11%):</td>
+                                                        <td class="text-end"><?= $formatIdr(3520) ?></td>
+                                                    </tr>
+                                                    <tr class="fw-bold">
+                                                        <td colspan="5" class="text-end">Total Akhir (Gross):</td>
+                                                        <td class="text-end text-success"><?= $formatIdr(35520) ?></td>
+                                                    </tr>
+                                                </tfoot>
+                                            </table>
                                         </div>
                                     </div>
-                                    <p class="mb-2">
-                                        <strong>Pelanggan:</strong> <?= htmlspecialchars((string) ($custDoc['id'] ?? 'C001')) ?> —
-                                        <?= htmlspecialchars((string) ($custDoc['name'] ?? 'Warung Kopi Pasar')) ?>
-                                        (Credit Limit: Rp<?= number_format((float) ($custDoc['credit_limit'] ?? 500000), 0, ',', '.') ?>)
-                                    </p>
-                                    <p class="mb-0 text-secondary">
-                                        8 pcs AIR-600 @Rp4.000 dari WH-PKU (Reserved 8 pcs) ·
-                                        Net Rp32.000 · PPN 11% Rp3.520 · <strong class="text-dark">Gross Rp35.520</strong>
-                                    </p>
+
+                                    <!-- 4. Log Notes / Chatter -->
+                                    <div class="o-chatter-box">
+                                        <div class="d-flex align-items-center justify-content-between mb-3">
+                                            <span class="small fw-bold text-secondary text-uppercase" style="letter-spacing: 0.05em;">
+                                                <i class="bi bi-clock-history me-1"></i> Log Notes &amp; Riwayat Dokumen
+                                            </span>
+                                            <span class="badge bg-white text-muted border">Odoo Chatter</span>
+                                        </div>
+                                        <div class="o-chatter-item">
+                                            <div class="o-chatter-avatar"><i class="bi bi-person-fill"></i></div>
+                                            <div class="o-chatter-content">
+                                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                                    <span class="fw-semibold small text-dark">Putri Aulia (Sales)</span>
+                                                    <span class="text-muted" style="font-size: 0.72rem;"><?= date('Y-m-d H:i') ?></span>
+                                                </div>
+                                                <div class="small text-secondary">
+                                                    Sales Order <strong>S00007</strong> berhasil dikonfirmasi. Stok <code>AIR-600</code> (8 pcs) dicadangkan otomatis di gudang <code>WH-PKU</code>. Harga dan diskon terkunci read-only (SR-07).
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 <?php endif; ?>
                             </div>
                         </div>

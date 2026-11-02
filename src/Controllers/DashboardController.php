@@ -90,8 +90,19 @@ class DashboardController
 
     public static function queryPosSales(): float
     {
+        $pdo = Database::getConnection();
         $t = self::ledgerTotals('4020');
-        return $t['credit'] - $t['debit'];
+        $ledgerSales = $t['credit'] - $t['debit'];
+
+        // Ditambah penjualan dari struk kasir sesi aktif yang belum di-close (Fase 1 POS)
+        $unpostedSales = (float) $pdo->query("
+            SELECT COALESCE(SUM(r.subtotal_net), 0)
+            FROM pos_receipts r
+            JOIN pos_sessions s ON s.session_number = r.session_number
+            WHERE r.status = 'Paid' AND (s.settlement_je_number IS NULL OR s.status != 'Closed')
+        ")->fetchColumn();
+
+        return $ledgerSales + $unpostedSales;
     }
 
     public static function queryCogs(): float
@@ -140,7 +151,7 @@ class DashboardController
     public static function getDrillDown(string $key): array
     {
         $pdo = Database::getConnection();
-        $fmt = static fn (float $n): string => 'Rp' . number_format($n, 0, ',', '.');
+        $fmt = static fn (float $n): string => 'Rp ' . number_format($n, 2, ',', '.');
 
         switch ($key) {
             case 'ar':
@@ -218,7 +229,27 @@ class DashboardController
             case 'cash':
                 return self::ledgerDrill('1020', 'cash', 'Rincian Cash Drawer POS (Akun 1020)', 'Jurnal Posted pada akun POS Cash Drawer (uang fisik kasir).', 'Saldo Cash Drawer', true);
             case 'pos_sales':
-                return self::ledgerDrill('4020', 'pos_sales', 'Rincian Pendapatan POS Sales (Akun 4020)', 'Jurnal pendapatan dari checkout struk POS (Paid) dikurangi refund.', 'Total Pendapatan POS', false);
+                $drill = self::ledgerDrill('4020', 'pos_sales', 'Rincian Pendapatan POS Sales (Akun 4020)', 'Jurnal pendapatan dari checkout struk POS (Paid) dikurangi refund.', 'Total Pendapatan POS', false);
+                $stmtUnposted = $pdo->query("
+                    SELECT r.receipt_number, r.created_at, r.session_number, r.cashier_name, r.subtotal_net
+                    FROM pos_receipts r
+                    JOIN pos_sessions s ON s.session_number = r.session_number
+                    WHERE r.status = 'Paid' AND (s.settlement_je_number IS NULL OR s.status != 'Closed')
+                    ORDER BY r.receipt_number
+                ");
+                while ($u = $stmtUnposted->fetch()) {
+                    $net = (float) $u['subtotal_net'];
+                    $drill['rows'][] = [
+                        $u['receipt_number'] . ' (Pending Close)',
+                        substr((string) $u['created_at'], 0, 10),
+                        (string) $u['session_number'],
+                        'Penjualan Kasir ' . $u['cashier_name'] . ' (Menunggu Tutup Sesi)',
+                        '-',
+                        $fmt($net)
+                    ];
+                    $drill['total'] = (float) ($drill['total'] ?? 0.0) + $net;
+                }
+                return $drill;
             case 'cogs':
                 return self::ledgerDrill('5010', 'cogs', 'Rincian COGS (Akun 5010)', 'Harga Pokok Penjualan dari delivery B2B dan checkout POS, dikurangi retur layak jual.', 'Total COGS', true);
         }
@@ -237,7 +268,7 @@ class DashboardController
             ORDER BY je.entry_number, jel.id
         ");
         $stmt->execute([':acc' => $account]);
-        $fmt  = static fn (float $n): string => $n > 0 ? 'Rp' . number_format($n, 0, ',', '.') : '-';
+        $fmt  = static fn (float $n): string => $n > 0 ? 'Rp ' . number_format($n, 2, ',', '.') : '-';
         $rows = [];
         $sum  = 0.0;
         foreach ($stmt->fetchAll() ?: [] as $r) {

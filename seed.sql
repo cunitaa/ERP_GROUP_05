@@ -174,23 +174,23 @@ FROM opening_stock;
 --            Equity (3010)    Rp25.161.900
 -- =============================================================================
 INSERT INTO chart_of_accounts (account_code, account_name, type, opening_debit, opening_credit) VALUES
-('1010', 'Bank',                     'Asset',                15000000,        0),
-('1020', 'POS Cash Drawer',          'Asset',                  200000,        0),
-('1100', 'Trade Receivables',        'Asset',                  888000,        0),
-('1130', 'Stock Valuation',          'Asset',                 9628900,        0),
-('1140', 'Input VAT',                'Asset',                       0,        0),
-('1150', 'Stock Interim Received',   'Liability / clearing',        0,        0),
-('1190', 'POS Settlement Clearing',  'Asset / clearing',            0,        0),
-('2010', 'Accounts Payable',         'Liability',                   0,   555000),
-('2030', 'Output VAT',               'Liability',                   0,        0),
-('3010', 'Opening Equity',           'Equity',                      0, 25161900),
-('4010', 'B2B Sales Revenue',        'Revenue',                     0,        0),
-('4020', 'POS Sales Revenue',        'Revenue',                     0,        0),
-('4030', 'Sales Returns',            'Contra Revenue',              0,        0),
-('5010', 'COGS',                     'Expense',                     0,        0),
-('5110', 'Purchase Price Variance',  'Expense',                     0,        0),
-('5130', 'Cash Over / Short',        'Expense or income',           0,        0),
-('5140', 'Stock Write-off',          'Expense',                     0,        0);
+('1010', 'Kas & Bank BCA',               'Asset',                15000000,        0),
+('1020', 'Laci Kasir (POS Cash Drawer)', 'Asset',                  200000,        0),
+('1100', 'Piutang Dagang (AR)',           'Asset',                  888000,        0),
+('1130', 'Valuasi Persediaan Stok (Inventory)', 'Asset',           9628900,        0),
+('1140', 'Input VAT (PPN Masukan / Dibayar Dimuka)', 'Asset',           0,        0),
+('1150', 'Hutang Penerimaan Barang (Stock Interim)', 'Liability / clearing', 0,   0),
+('1190', 'Kliring Transaksi Kasir POS',  'Asset / clearing',            0,        0),
+('2010', 'Hutang Dagang (AP)',            'Liability',                   0,   555000),
+('2030', 'Output VAT (PPN Keluaran / Hutang PPN)', 'Liability',         0,        0),
+('3010', 'Modal Disetor (Opening Equity)','Equity',                      0, 25161900),
+('4010', 'B2B Sales Revenue (DPP Penjualan B2B)', 'Revenue',             0,        0),
+('4020', 'POS Sales Revenue (DPP Penjualan Kasir)', 'Revenue',           0,        0),
+('4030', 'Retur Penjualan (Sales Returns)', 'Contra Revenue',           0,        0),
+('5010', 'Harga Pokok Penjualan (COGS)',  'Expense',                     0,        0),
+('5110', 'Selisih Harga Beli (PPV)',      'Expense',                     0,        0),
+('5130', 'Selisih Kasir (Cash Over / Short)', 'Expense or income',       0,        0),
+('5140', 'Penghapusan Stok Rusak (Write-off)', 'Expense',                0,        0);
 
 -- Header & Baris Jurnal Pembukaan (bukan transaksi uji)
 INSERT INTO journal_entries (entry_number, entry_date, source_document, description, status, is_opening_entry, total_debit, total_credit) VALUES

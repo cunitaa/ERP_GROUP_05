@@ -130,49 +130,124 @@ $flash       = $vm['flash_result'] ?? null;
         </div>
     <?php endif; ?>
 
-    <!-- Panel Aksi Uji Skenario T-01, T-02, T-04, T-08 & Reset Seed -->
+    <!-- Panel Aksi Uji Skenario T-01 s/d T-36 & Reset Seed -->
     <div class="card border shadow-sm">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center">
-            <strong>Simulator Pengujian Skenario (T-01, T-02, T-04, T-07, T-08 &amp; SR-18)</strong>
-            <form method="POST" action="debug.php" class="m-0">
-                <input type="hidden" name="intent" value="action">
-                <input type="hidden" name="command" value="reset_seed">
-                <button type="submit" class="btn btn-sm btn-outline-secondary fw-semibold">
-                    ↺ Reset Baseline Seed (Fixture)
-                </button>
-            </form>
+        <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div>
+                <strong class="text-dark">🧪 Test Suite Console &amp; Validator Operasional (T-01 s/d T-36 · SR-01 s/d SR-22)</strong>
+                <div class="text-muted small">Eksekusi otomatis seluruh skenario pengujian lintas-modul &amp; pemulihan fixture otomatis (PRG Protected).</div>
+            </div>
+            <div class="d-flex gap-2">
+                <form method="POST" action="debug.php" class="m-0">
+                    <input type="hidden" name="intent" value="action">
+                    <input type="hidden" name="command" value="run_all_tests">
+                    <button type="submit" class="btn btn-sm btn-primary fw-bold shadow-sm">
+                        ⚡ Jalankan Seluruh 34 Skenario Uji (T-01 s/d T-36)
+                    </button>
+                </form>
+                <form method="POST" action="debug.php" class="m-0">
+                    <input type="hidden" name="intent" value="action">
+                    <input type="hidden" name="command" value="reset_seed">
+                    <button type="submit" class="btn btn-sm btn-outline-secondary fw-semibold">
+                        ↺ Reset Baseline (Rp25.716.900)
+                    </button>
+                </form>
+            </div>
         </div>
         <div class="card-body">
+            <?php
+            $suite = $vm['test_suite_result'] ?? null;
+            ?>
+            <?php if (is_array($suite) && !empty($suite['scenarios'])): ?>
+                <?php
+                $summary  = (array) ($suite['summary'] ?? []);
+                $scenarios= (array) ($suite['scenarios'] ?? []);
+                $allOk    = (bool) ($summary['all_passed'] ?? false);
+                ?>
+                <div class="p-3 mb-3 rounded-3 <?= $allOk ? 'bg-success-subtle text-success-emphasis border border-success' : 'bg-danger-subtle text-danger-emphasis border border-danger' ?>">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <div>
+                            <h6 class="fw-bold mb-1">
+                                <?= $allOk ? '✅ SELURUH SKENARIO UJI BERHASIL (100% PASS)' : '⚠️ TERDAPAT SKENARIO UJI YANG GAGAL' ?>
+                            </h6>
+                            <span class="small">
+                                Lulus: <strong><?= (int) ($summary['passed'] ?? 0) ?></strong> dari <strong><?= (int) ($summary['total'] ?? 0) ?></strong> skenario uji
+                                · Gagal: <strong><?= (int) ($summary['failed'] ?? 0) ?></strong>
+                                · Durasi Eksekusi: <strong><?= htmlspecialchars((string) ($summary['duration_ms'] ?? 0)) ?> ms</strong>
+                                · Database Fixture: <strong>Pulih Otomatis ke Rp25.716.900</strong>
+                            </span>
+                        </div>
+                        <form method="POST" action="debug.php" class="m-0">
+                            <input type="hidden" name="intent" value="action">
+                            <input type="hidden" name="command" value="clear_test_results">
+                            <button type="submit" class="btn btn-sm btn-outline-dark">
+                                Sembunyikan Tabel Hasil
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="table-responsive mb-4" style="max-height: 480px; overflow-y: auto;">
+                    <table class="table table-sm table-striped table-hover align-middle mb-0" style="font-size: 0.82rem;">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th style="width: 75px;">Kode</th>
+                                <th style="width: 100px;">Aturan</th>
+                                <th>Deskripsi Skenario Uji (Definition of Done)</th>
+                                <th style="width: 85px;" class="text-center">Status</th>
+                                <th>Keterangan / Bukti Operasional</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($scenarios as $sc): ?>
+                                <?php $scPass = (($sc['status'] ?? '') === 'PASS'); ?>
+                                <tr>
+                                    <td><strong class="text-dark"><?= htmlspecialchars((string) ($sc['code'] ?? '')) ?></strong></td>
+                                    <td><span class="badge bg-secondary"><?= htmlspecialchars((string) ($sc['rule'] ?? '')) ?></span></td>
+                                    <td><?= htmlspecialchars((string) ($sc['name'] ?? '')) ?></td>
+                                    <td class="text-center">
+                                        <span class="badge <?= $scPass ? 'bg-success' : 'bg-danger' ?>">
+                                            <?= $scPass ? '✓ PASS' : '✗ FAIL' ?>
+                                        </span>
+                                    </td>
+                                    <td class="text-muted small"><?= htmlspecialchars((string) ($sc['details'] ?? '')) ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endif; ?>
+
             <div class="d-flex flex-wrap gap-2 mb-3">
                 <form method="POST" action="debug.php" class="m-0">
                     <input type="hidden" name="intent" value="action">
                     <input type="hidden" name="command" value="post_vendor_bill">
-                    <button type="submit" class="btn btn-sm btn-danger">
-                        [Uji T-02] Post Vendor Bill (BILL-0001) — Hanya Finance
+                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                        [Uji Coba T-02] Post Vendor Bill (BILL-0001) — Uji Blokir Role Sales
                     </button>
                 </form>
 
                 <form method="POST" action="debug.php" class="m-0">
                     <input type="hidden" name="intent" value="action">
                     <input type="hidden" name="command" value="close_pos_session">
-                    <button type="submit" class="btn btn-sm btn-danger">
-                        [Uji T-02] Tutup Sesi POS (POS-SESSION-0001) — Hanya Cashier/Finance
+                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                        [Uji Coba T-02] Tutup Sesi POS (POS-SESSION-0001) — Uji Blokir Role Sales
                     </button>
                 </form>
 
                 <form method="POST" action="debug.php" class="m-0">
                     <input type="hidden" name="intent" value="action">
                     <input type="hidden" name="command" value="update_credit_limit">
-                    <button type="submit" class="btn btn-sm btn-warning text-dark fw-semibold">
-                        [Uji T-04] Ubah Credit Limit C001 — Hanya Sales/Finance
+                    <button type="submit" class="btn btn-sm btn-outline-warning text-dark fw-semibold">
+                        [Uji Coba T-04] Ubah Credit Limit C001 — Uji Blokir Role Warehouse
                     </button>
                 </form>
 
                 <form method="POST" action="debug.php" class="m-0">
                     <input type="hidden" name="intent" value="action">
                     <input type="hidden" name="command" value="convert_lead">
-                    <button type="submit" class="btn btn-sm btn-dark">
-                        [Uji T-07/T-08] Convert LEAD-0001 ke Opportunity — Hanya Sales
+                    <button type="submit" class="btn btn-sm btn-outline-dark">
+                        [Uji Coba T-07/T-08] Convert LEAD-0001 — Anti-Replay Guard
                     </button>
                 </form>
             </div>

@@ -32,6 +32,7 @@ require_once __DIR__ . DIRECTORY_SEPARATOR . 'controllers' . DIRECTORY_SEPARATOR
 require_once __DIR__ . DIRECTORY_SEPARATOR . 'controllers' . DIRECTORY_SEPARATOR . 'PosController.php';
 require_once __DIR__ . DIRECTORY_SEPARATOR . 'controllers' . DIRECTORY_SEPARATOR . 'ReportController.php';
 
+use RantauMart\Config\RolePermissions;
 use RantauMart\Controllers\AccountingController;
 use RantauMart\Controllers\AuthController;
 use RantauMart\Controllers\DashboardController;
@@ -42,6 +43,7 @@ use RantauMart\Controllers\PurchaseController;
 use RantauMart\Controllers\ReportController;
 use RantauMart\Controllers\SalesController;
 use RantauMart\Middleware\Middleware;
+use RantauMart\Services\AuditLogger;
 use RantauMart\Services\AuthService;
 use RantauMart\Services\FlashService;
 
@@ -63,93 +65,144 @@ $currentUser = AuthService::getCurrentUser();
 $currentRole = (string) ($currentUser['role'] ?? 'Sales');
 
 // Parameter Navigasi Dinamis Modular: ?page=sales, ?page=purchase, ?page=inventory, dsb.
-$pageParam   = strtolower(trim((string) ($requestData['page'] ?? '')));
-$moduleParam = trim((string) ($requestData['module'] ?? ''));
-$screenParam = trim((string) ($requestData['screen'] ?? ''));
+// Mendukung pengetikan ?view=accounting, ?view=sales, dsb.
+$rawPage   = strtolower(trim((string) ($requestData['page'] ?? '')));
+$rawModule = trim((string) ($requestData['module'] ?? ''));
+$rawScreen = trim((string) ($requestData['screen'] ?? ''));
+$rawView   = strtolower(trim((string) ($requestData['view'] ?? '')));
 
-$activePage   = 'dashboard';
-$activeModule = 'Apps';
+// Jika ?view=... berisi kata kunci modul (contoh: Kasir mengetik ?view=accounting), arahkan sebagai target page
+if ($rawPage === '' && in_array($rawView, ['accounting', 'sales', 'purchase', 'inventory', 'pos', 'governance', 'finance', 'warehouse', 'procurement', 'crm'], true)) {
+    $rawPage = $rawView;
+}
 
-if ($pageParam !== '') {
-    if (in_array($pageParam, ['dashboard', 'home', 'overview', 'apps'], true)) {
+$requestedTarget = null;
+if ($rawPage !== '') {
+    if (in_array($rawPage, ['sales', 'crm'], true)) {
+        $requestedTarget = 'sales';
+    } elseif (in_array($rawPage, ['purchase', 'procurement', 'rfq', 'po'], true)) {
+        $requestedTarget = 'purchase';
+    } elseif (in_array($rawPage, ['inventory', 'warehouse', 'stock'], true)) {
+        $requestedTarget = 'inventory';
+    } elseif (in_array($rawPage, ['accounting', 'finance', 'invoicing'], true)) {
+        $requestedTarget = 'accounting';
+    } elseif (in_array($rawPage, ['pos', 'cashier', 'point_of_sale'], true)) {
+        $requestedTarget = 'pos';
+    } elseif (in_array($rawPage, ['governance', 'executive', 'audit', 'report', 'reports'], true)) {
+        $requestedTarget = 'governance';
+    } elseif (in_array($rawPage, ['dashboard', 'home', 'overview', 'apps'], true)) {
+        $requestedTarget = 'dashboard';
+    }
+} elseif ($rawModule !== '' && $rawModule !== 'Apps') {
+    if ($rawModule === 'Sales' || $rawModule === 'CRM') {
+        $requestedTarget = 'sales';
+    } elseif ($rawModule === 'Purchase') {
+        $requestedTarget = 'purchase';
+    } elseif ($rawModule === 'Inventory') {
+        $requestedTarget = 'inventory';
+    } elseif ($rawModule === 'Point of Sale' || $rawModule === 'POS') {
+        $requestedTarget = 'pos';
+    } elseif ($rawModule === 'Accounting') {
+        $requestedTarget = ($rawScreen === 'S-18' || $rawScreen === 'CFG-GOV') ? 'governance' : 'accounting';
+    }
+} elseif ($rawScreen !== '') {
+    if (in_array($rawScreen, ['S-02', 'S-04', 'S-05', 'CFG-SALES'], true)) {
+        $requestedTarget = 'sales';
+    } elseif (in_array($rawScreen, ['S-08', 'CFG-PROC'], true)) {
+        $requestedTarget = 'purchase';
+    } elseif (in_array($rawScreen, ['S-03', 'S-06', 'S-07', 'S-09', 'S-17', 'CFG-WH'], true)) {
+        $requestedTarget = 'inventory';
+    } elseif (in_array($rawScreen, ['S-14', 'S-15', 'S-16', 'RPT-POS', 'CFG-POS'], true)) {
+        $requestedTarget = 'pos';
+    } elseif ($rawScreen === 'S-18' || $rawScreen === 'CFG-GOV') {
+        $requestedTarget = 'governance';
+    } elseif (in_array($rawScreen, ['S-10', 'S-11', 'S-12', 'S-13', 'CFG-FIN'], true)) {
+        $requestedTarget = 'accounting';
+    }
+}
+
+$homeConfig      = RolePermissions::getHomeForRole($currentRole);
+$accessViolation = false;
+$deniedReason    = '';
+$flashResult     = null;
+
+if ($requestedTarget !== null) {
+    if ($requestedTarget === 'dashboard') {
+        // Beranda Dashboard Landing Page diizinkan
         $activePage   = 'dashboard';
         $activeModule = 'Apps';
-        if ($screenParam === '') {
-            $screenParam = ($currentRole === 'Owner' || $currentRole === 'Finance') ? 'S-18' : 'S-01';
-        }
-    } elseif (in_array($pageParam, ['sales', 'crm'], true)) {
-        $activePage   = 'sales';
-        $activeModule = ($pageParam === 'crm' || $moduleParam === 'CRM') ? 'CRM' : 'Sales';
-        if ($screenParam === '') {
-            $screenParam = 'S-05';
-        }
-    } elseif (in_array($pageParam, ['purchase', 'procurement', 'rfq', 'po'], true)) {
-        $activePage   = 'purchase';
-        $activeModule = 'Purchase';
-        if ($screenParam === '') {
-            $screenParam = 'S-08';
-        }
-    } elseif (in_array($pageParam, ['inventory', 'warehouse', 'stock'], true)) {
-        $activePage   = 'inventory';
-        $activeModule = 'Inventory';
-        if ($screenParam === '') {
-            $screenParam = 'S-06';
-        }
-    } elseif (in_array($pageParam, ['accounting', 'finance', 'invoicing'], true)) {
-        $activePage   = 'accounting';
-        $activeModule = 'Accounting';
-        if ($screenParam === '') {
-            $screenParam = 'S-10';
-        }
-    } elseif (in_array($pageParam, ['pos', 'cashier', 'point_of_sale'], true)) {
-        $activePage   = 'pos';
-        $activeModule = 'Point of Sale';
-        if ($screenParam === '') {
-            $screenParam = 'S-15';
-        }
-    } elseif (in_array($pageParam, ['governance', 'executive', 'audit', 'report', 'reports'], true)) {
-        $activePage   = 'governance';
-        $activeModule = 'Accounting';
-        $screenParam  = 'S-18';
-    }
-} elseif ($moduleParam !== '' && $moduleParam !== 'Apps') {
-    $activeModule = $moduleParam;
-    if ($moduleParam === 'Sales' || $moduleParam === 'CRM') {
-        $activePage = 'sales';
-    } elseif ($moduleParam === 'Purchase') {
-        $activePage = 'purchase';
-    } elseif ($moduleParam === 'Inventory') {
-        $activePage = 'inventory';
-    } elseif ($moduleParam === 'Point of Sale') {
-        $activePage = 'pos';
-    } elseif ($moduleParam === 'Accounting') {
-        $activePage = ($screenParam === 'S-18' || $screenParam === 'CFG-GOV') ? 'governance' : 'accounting';
-    }
-} elseif ($screenParam !== '') {
-    if (in_array($screenParam, ['S-02', 'S-04', 'S-05', 'CFG-SALES'], true)) {
-        $activePage   = 'sales';
-        $activeModule = 'Sales';
-    } elseif (in_array($screenParam, ['S-08', 'CFG-PROC'], true)) {
-        $activePage   = 'purchase';
-        $activeModule = 'Purchase';
-    } elseif (in_array($screenParam, ['S-03', 'S-06', 'S-07', 'S-09', 'S-17', 'CFG-WH'], true)) {
-        $activePage   = 'inventory';
-        $activeModule = 'Inventory';
-    } elseif (in_array($screenParam, ['S-14', 'S-15', 'S-16', 'RPT-POS', 'CFG-POS'], true)) {
-        $activePage   = 'pos';
-        $activeModule = 'Point of Sale';
-    } elseif ($screenParam === 'S-18' || $screenParam === 'CFG-GOV') {
-        $activePage   = 'governance';
-        $activeModule = 'Accounting';
-    } elseif (in_array($screenParam, ['S-10', 'S-11', 'S-12', 'S-13', 'CFG-FIN'], true)) {
-        $activePage   = 'accounting';
-        $activeModule = 'Accounting';
+        $screenParam  = ($currentRole === 'Owner' || $currentRole === 'Finance') ? 'S-18' : 'S-01';
+    } elseif (!RolePermissions::isPageAllowedForRole($currentRole, $requestedTarget)) {
+        // Pelanggaran Strict RBAC (F-01 & SR-18): Pengguna mencoba mengakses modul divisi lain!
+        $accessViolation = true;
+        $targetTitle     = ucfirst($requestedTarget);
+        $deniedReason    = sprintf(
+            "403 Access Denied (Strict RBAC): Role '%s' (%s) dilarang mengakses modul '%s'. Sistem mengembalikan Anda secara otomatis ke ruang kerja '%s'.",
+            $currentRole,
+            (string) ($currentUser['full_name'] ?? $currentRole),
+            $targetTitle,
+            $homeConfig['title']
+        );
+
+        // Catat insiden ke tabel audit_logs
+        AuditLogger::log(
+            actor: "{$currentUser['full_name']} ({$currentUser['username']})",
+            role: $currentRole,
+            module: $targetTitle,
+            action: 'module.access',
+            documentNumber: 'ACCESS-DENIED-' . strtoupper($requestedTarget),
+            oldStatus: 'Active',
+            newStatus: 'Denied',
+            outcome: 'DENIED',
+            reason: $deniedReason
+        );
+
+        // Flash Toast Notification merah di pojok kanan atas
+        FlashService::error($deniedReason);
+
+        $flashResult = [
+            'allowed'            => false,
+            'http_code'          => 403,
+            'outcome'            => 'DENIED',
+            'decision'           => 'DENIED',
+            'rule'               => 'SR-18',
+            'status_changed'     => false,
+            'document_preserved' => true,
+            'target_module'      => $targetTitle,
+            'redirected_to'      => $homeConfig['page'],
+            'reason'             => $deniedReason,
+            'message'            => $deniedReason,
+        ];
+
+        // Otomatis kembalikan ke modul asal stakeholder!
+        $activePage   = $homeConfig['page'];
+        $activeModule = $homeConfig['module'];
+        $screenParam  = $homeConfig['screen'];
     } else {
-        $activePage   = 'dashboard';
-        $activeModule = 'Apps';
+        // Akses diizinkan
+        $activePage = $requestedTarget;
+        if ($activePage === 'sales') {
+            $activeModule = ($rawPage === 'crm' || $rawModule === 'CRM' || $rawScreen === 'S-04') ? 'CRM' : 'Sales';
+            $screenParam  = $rawScreen !== '' ? $rawScreen : 'S-05';
+        } elseif ($activePage === 'purchase') {
+            $activeModule = 'Purchase';
+            $screenParam  = $rawScreen !== '' ? $rawScreen : 'S-08';
+        } elseif ($activePage === 'inventory') {
+            $activeModule = 'Inventory';
+            $screenParam  = $rawScreen !== '' ? $rawScreen : 'S-06';
+        } elseif ($activePage === 'accounting') {
+            $activeModule = 'Accounting';
+            $screenParam  = $rawScreen !== '' ? $rawScreen : 'S-10';
+        } elseif ($activePage === 'pos') {
+            $activeModule = 'Point of Sale';
+            $screenParam  = $rawScreen !== '' ? $rawScreen : 'S-15';
+        } elseif ($activePage === 'governance') {
+            $activeModule = 'Accounting';
+            $screenParam  = 'S-18';
+        }
     }
 } else {
-    // Default Beranda (Landing Page): tanpa parameter -> 'Dashboard KPI Eksekutif'
+    // Default Beranda (Landing Page): tanpa parameter -> 'Dashboard'
     $activePage   = 'dashboard';
     $activeModule = 'Apps';
     $screenParam  = ($currentRole === 'Owner' || $currentRole === 'Finance') ? 'S-18' : 'S-01';
@@ -177,9 +230,16 @@ if ($intent === '' && str_starts_with($normalizedUri, '/api/')) {
     }
 }
 
-if (isset($_SESSION['flash_toast']) && is_array($_SESSION['flash_toast'])) {
-    $flashResult = $_SESSION['flash_toast'];
-    unset($_SESSION['flash_toast']);
+if (!$accessViolation) {
+    if (isset($_SESSION['flash_result']) && is_array($_SESSION['flash_result'])) {
+        $flashResult = $_SESSION['flash_result'];
+        unset($_SESSION['flash_result']);
+    }
+
+    if (isset($_SESSION['flash_toast']) && is_array($_SESSION['flash_toast'])) {
+        $flashResult = $_SESSION['flash_toast'];
+        unset($_SESSION['flash_toast']);
+    }
 }
 
 $acceptHeader = (string) ($_SERVER['HTTP_ACCEPT'] ?? '');
@@ -222,6 +282,17 @@ if ($intent === 'login') {
     $flashResult = HomeAppsController::executeGuardedAction($command, $requestData);
 }
 
+// PRG (Post/Redirect/Get): Cegah pengiriman formulir ganda & duplikasi transaksi saat browser di-refresh (F5)
+if ($requestMethod === 'POST' && PHP_SAPI !== 'cli' && !$wantsJson && !headers_sent() && $intent !== '' && $intent !== 'login' && $intent !== 'logout') {
+    $_SESSION['flash_result'] = $flashResult;
+    $targetPage   = urlencode($activePage);
+    $targetModule = urlencode($activeModule);
+    $targetScreen = urlencode($screenParam);
+    $targetView   = urlencode((string) ($getParams['view'] ?? $requestData['view'] ?? 'list'));
+    header("Location: index.php?page={$targetPage}&module={$targetModule}&screen={$targetScreen}&view={$targetView}");
+    exit;
+}
+
 $vm = HomeAppsController::getDashboardViewModel($flashResult, $activeModule, $requestData);
 $vm['active_page'] = $activePage;
 
@@ -243,8 +314,12 @@ if ($wantsJson) {
     exit;
 }
 
-if (is_array($flashResult) && isset($flashResult['http_code'])) {
+if ($accessViolation) {
+    http_response_code(403);
+} elseif (is_array($flashResult) && isset($flashResult['http_code'])) {
     http_response_code((int) ($flashResult['http_code'] ?? 200));
+} else {
+    http_response_code(200);
 }
 
 require __DIR__ . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'Views' . DIRECTORY_SEPARATOR . 'layout.php';
